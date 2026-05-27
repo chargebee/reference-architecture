@@ -1,0 +1,34 @@
+{
+  "name": "pointer",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "bootstrap:chargebee": "tsx --env-file=.env.local scripts/bootstrap-chargebee.ts"
+  },
+  "dependencies": {
+    "@chargebee/better-auth": "^1.1.0",
+    "better-auth": "^1.6.11",
+    "chargebee": "^3.24.0",
+    "kysely": "^0.29.2",
+    "next": "16.2.6",
+    "pg": "^8.21.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/pg": "^8.20.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.6",
+    "tailwindcss": "^4",
+    "tsx": "^4.22.3",
+    "typescript": "^5"
+  }
+}
