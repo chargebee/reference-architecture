@@ -1,4 +1,4 @@
-# Reference Architecture — PLG SaaS at 100M Users (AI Product)
+# Pointer
 
 A production-grade, language-agnostic reference architecture for a **Product-Led Growth**
 SaaS platform with a usage + subscription business model, designed to scale to

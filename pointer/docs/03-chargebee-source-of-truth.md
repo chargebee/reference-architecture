@@ -6,7 +6,7 @@ entitlement cache* — never an authoritative copy.
 
 This document specifies the **boundary, object mapping, webhook ingestion, usage push, and
 reconciliation**. The full **product entitlement catalog (concrete features, plans,
-entitlement values)** lives in [`07-product-and-entitlements.md`](07-product-and-entitlements.md).
+entitlement values)** lives in `[07-product-and-entitlements.md](07-product-and-entitlements.md)`.
 
 > **Customer mapping:** `Chargebee customer` is **1:1 with `accounts.account_id`**. A user
 > has at least one account (Personal); Team/Enterprise accounts are separate Chargebee
@@ -50,16 +50,18 @@ flowchart LR
     Bus --> Projector["Billing read-model<br/>projector"] --> PG_B
 ```
 
+
+
 **Boundary rules (normative):**
 
 1. **Only `Billing BFF` issues mutations to Chargebee.** Other services request changes by
-   calling Billing BFF.
+  calling Billing BFF.
 2. **Only `Webhook Ingestor` accepts Chargebee events.** Webhooks are not exposed to other
-   services; the bus is the integration surface.
-3. **Only `Entitlement Sync` writes `entitlements_current` and Redis `ent:*`.**
-4. **Only `Credit Projector` writes `credit_ledger` and Redis `credits:*`.**
+  services; the bus is the integration surface.
+3. **Only `Entitlement Sync` writes `entitlements_current` and Redis `ent:`*.**
+4. **Only `Credit Projector` writes `credit_ledger` and Redis `credits:`*.**
 5. **No service ever calls Chargebee on the request hot path.** If the cache + PG are empty,
-   the answer is the **default Free-tier set** baked into config.
+  the answer is the **default Free-tier set** baked into config.
 
 ---
 
@@ -67,13 +69,15 @@ flowchart LR
 
 ### 2.1 Customer ↔ Account (1:1)
 
-| Chargebee | Platform |
-|---|---|
-| `customer.id` | Same as our `account_id` (UUIDv7 string) |
-| `customer.email` | Owner user's email at the time of creation |
-| `customer.first_name` / `last_name` | Optional, populated for Personal accounts |
-| `customer.company` | Account name for Team/Enterprise |
+
+| Chargebee                                                          | Platform                                               |
+| ------------------------------------------------------------------ | ------------------------------------------------------ |
+| `customer.id`                                                      | Same as our `account_id` (UUIDv7 string)               |
+| `customer.email`                                                   | Owner user's email at the time of creation             |
+| `customer.first_name` / `last_name`                                | Optional, populated for Personal accounts              |
+| `customer.company`                                                 | Account name for Team/Enterprise                       |
 | Custom fields `cf_account_id`, `cf_account_type`, `cf_environment` | Set on creation; carried back in every webhook payload |
+
 
 **Convention** when Billing BFF creates a Chargebee customer:
 
@@ -90,15 +94,17 @@ lookup, and makes `create_customer` naturally idempotent on retry.
 
 ### 2.2 Plan, Item Price, Subscription
 
-| Chargebee | Platform |
-|---|---|
-| `item` (`type=plan`) | Plan family — `plan-free`, `plan-pro`, `plan-max`, `plan-team`, `plan-enterprise` |
-| `item_price` | Concrete priced variant — `plan-team-USD-Monthly` etc. |
-| `item` (`type=charge`) | Credit packs — `pack-credits-1k` etc. |
-| `subscription` | A single tier on an account; `plan_quantity` = seat count for Team |
-| `subscription_entitlement` (override) | Per-account custom entitlements (Enterprise) |
 
-> See [`07-product-and-entitlements.md`](07-product-and-entitlements.md) §4 for the concrete
+| Chargebee                             | Platform                                                                          |
+| ------------------------------------- | --------------------------------------------------------------------------------- |
+| `item` (`type=plan`)                  | Plan family — `plan-free`, `plan-pro`, `plan-max`, `plan-team`, `plan-enterprise` |
+| `item_price`                          | Concrete priced variant — `plan-team-USD-Monthly` etc.                            |
+| `item` (`type=charge`)                | Credit packs — `pack-credits-1k` etc.                                             |
+| `subscription`                        | A single tier on an account; `plan_quantity` = seat count for Team                |
+| `subscription_entitlement` (override) | Per-account custom entitlements (Enterprise)                                      |
+
+
+> See `[07-product-and-entitlements.md](07-product-and-entitlements.md)` §4 for the concrete
 > catalog: feature definitions, plan items, item entitlements, credit pack items.
 
 ### 2.3 Free Tier
@@ -131,15 +137,15 @@ Account (= cb_customer)
 2. For each subscription, fetch item_entitlements for plan + addons.
 3. Apply subscription_entitlements (overrides) — these win.
 4. Combine across subscriptions per the policy:
-   - `switch`: any `true` wins
-   - `quantity`: take the **maximum** value (or `unlimited`)
-   - `range`: union (broadest)
-   - `custom`: highest-tier label wins (per a configured ordering)
+  - `switch`: any `true` wins
+  - `quantity`: take the **maximum** value (or `unlimited`)
+  - `range`: union (broadest)
+  - `custom`: highest-tier label wins (per a configured ordering)
 5. **Apply seat multiplication** for pooled metrics (`f_input_tokens_daily`,
-   `f_output_tokens_daily`, `f_credits_monthly`):
+  `f_output_tokens_daily`, `f_credits_monthly`):
    `effective = raw_value × subscription.plan_quantity`. Values like `unlimited` are passed through unchanged.
 6. Write `entitlements_current` (account_id, feature_id, raw_value, effective_value) and
-   refresh `ent:{account_id}` in Redis.
+  refresh `ent:{account_id}` in Redis.
 
 The runtime hot-path always reads `effective_value`. It does not need to know about seats.
 
@@ -159,12 +165,14 @@ POST /entitlements/{account_id}/check
   }
 ```
 
-| Hop | Latency budget | Behaviour |
-|---|---|---|
-| In-process LRU (per-pod) | < 100 µs | TTL ≤ 30 s; bounded size |
-| Redis (`ent:{account_id}`) | < 1 ms p50, 5 ms p99 | Authoritative for hot path |
-| `pg-billing.entitlements_current` | < 10 ms p99 | Fallback on Redis miss |
-| Chargebee API | not allowed on hot path | Reconciliation only |
+
+| Hop                               | Latency budget          | Behaviour                  |
+| --------------------------------- | ----------------------- | -------------------------- |
+| In-process LRU (per-pod)          | < 100 µs                | TTL ≤ 30 s; bounded size   |
+| Redis (`ent:{account_id}`)        | < 1 ms p50, 5 ms p99    | Authoritative for hot path |
+| `pg-billing.entitlements_current` | < 10 ms p99             | Fallback on Redis miss     |
+| Chargebee API                     | not allowed on hot path | Reconciliation only        |
+
 
 If both Redis and PG are unavailable, the service returns the **default Free-tier set** from
 config and emits an alert. No user-facing 5xx.
@@ -216,6 +224,8 @@ sequenceDiagram
     end
 ```
 
+
+
 ### 4.3 Idempotency
 
 - **At ingestor:** `INSERT INTO webhook_inbox (cb_event_id, ...) ON CONFLICT DO NOTHING`.
@@ -225,18 +235,20 @@ sequenceDiagram
 
 ### 4.4 Event Types Consumed
 
-| Internal event | Triggered by Chargebee event types |
-|---|---|
-| `subscription.activated.v1` | `subscription_created`, `subscription_activated`, `subscription_started` |
-| `subscription.changed.v1` | `subscription_changed`, `subscription_renewed`, `subscription_reactivated`, plan/quantity change |
-| `subscription.cancelled.v1` | `subscription_cancelled`, `subscription_paused` |
-| `subscription.trial_ending.v1` | `subscription_trial_end_reminder` |
-| `subscription.entitlement_overridden.v1` | `subscription_entitlement_*` |
-| `entitlement.changed.v1` | any `entitlement_*` events at the item level |
-| `invoice.generated.v1` | `invoice_generated` |
-| `invoice.paid.v1` | `payment_succeeded` (filter for credit-pack item to drive Credit Projector) |
-| `invoice.payment_failed.v1` | `payment_failed` |
-| `customer.changed.v1` | `customer_changed`, `customer_deleted` |
+
+| Internal event                           | Triggered by Chargebee event types                                                               |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `subscription.activated.v1`              | `subscription_created`, `subscription_activated`, `subscription_started`                         |
+| `subscription.changed.v1`                | `subscription_changed`, `subscription_renewed`, `subscription_reactivated`, plan/quantity change |
+| `subscription.cancelled.v1`              | `subscription_cancelled`, `subscription_paused`                                                  |
+| `subscription.trial_ending.v1`           | `subscription_trial_end_reminder`                                                                |
+| `subscription.entitlement_overridden.v1` | `subscription_entitlement_`*                                                                     |
+| `entitlement.changed.v1`                 | any `entitlement_*` events at the item level                                                     |
+| `invoice.generated.v1`                   | `invoice_generated`                                                                              |
+| `invoice.paid.v1`                        | `payment_succeeded` (filter for credit-pack item to drive Credit Projector)                      |
+| `invoice.payment_failed.v1`              | `payment_failed`                                                                                 |
+| `customer.changed.v1`                    | `customer_changed`, `customer_deleted`                                                           |
+
 
 Full Chargebee event schema: see `chargebee-integration` skill `references/events.md`.
 
@@ -257,6 +269,8 @@ flowchart LR
     CB -.->|"webhook<br/>usage_recorded"| WH["Webhook Ingestor"]
     WH --> Bus
 ```
+
+
 
 **Aggregator algorithm (per minute, per metered subscription):**
 
@@ -299,15 +313,17 @@ Three jobs run on schedules to detect and correct drift:
 
 ## 7. Failure Modes
 
-| Failure | Effect | Mitigation |
-|---|---|---|
-| Chargebee API down (Billing BFF) | Checkout / portal / upgrade / pack purchase unavailable | Retry with idempotency keys; show maintenance banner; fail closed only on writes |
-| Chargebee API down (Usage push) | No metered bill push; usage still recorded in CH | Push retried with backoff; DLQ after N hours; reconciler catches up |
-| Webhooks delayed | Entitlements stale | Hourly reconciler bridges; users unaffected within budget (5 s p99) |
-| Entitlement Sync lag | Account paid but features locked | Critical alert; emergency manual recompute path |
-| Credit Projector lag | Pack purchased but balance not visible | Critical alert; the ledger is the source of truth, recoverable on replay |
-| Redis ent cluster down | Hot-path latency rises | Fallback to `pg-billing` (warm path) |
-| `pg-billing` unavailable | New webhooks queue up | Webhook Ingestor still ingests (writes to inbox); processing resumes when PG returns |
+
+| Failure                          | Effect                                                  | Mitigation                                                                           |
+| -------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Chargebee API down (Billing BFF) | Checkout / portal / upgrade / pack purchase unavailable | Retry with idempotency keys; show maintenance banner; fail closed only on writes     |
+| Chargebee API down (Usage push)  | No metered bill push; usage still recorded in CH        | Push retried with backoff; DLQ after N hours; reconciler catches up                  |
+| Webhooks delayed                 | Entitlements stale                                      | Hourly reconciler bridges; users unaffected within budget (5 s p99)                  |
+| Entitlement Sync lag             | Account paid but features locked                        | Critical alert; emergency manual recompute path                                      |
+| Credit Projector lag             | Pack purchased but balance not visible                  | Critical alert; the ledger is the source of truth, recoverable on replay             |
+| Redis ent cluster down           | Hot-path latency rises                                  | Fallback to `pg-billing` (warm path)                                                 |
+| `pg-billing` unavailable         | New webhooks queue up                                   | Webhook Ingestor still ingests (writes to inbox); processing resumes when PG returns |
+
 
 The **fail-safe stance** for entitlement is *deny questionable, allow only what is positively
 known*. Free-tier defaults are baked in code so no external dependency is required to make

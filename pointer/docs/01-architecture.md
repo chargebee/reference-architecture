@@ -8,7 +8,7 @@ The platform is an AI product (see `[07-product-and-entitlements.md](07-product-
 with a two-level identity model:
 
 - `**user_id`** — auth identity, partition key for product data.
-- `**account_id**` — billing subject, partition key for entitlements & quotas. 1:1 with a Chargebee customer.
+- `**account_id`** — billing subject, partition key for entitlements & quotas. 1:1 with a Chargebee customer.
 
 Every authenticated request carries both in the JWT (`sub`, `acc`).
 
@@ -182,7 +182,7 @@ Enterprise per-token metering, and into credit-ledger debits when an account is 
 | Aspect          | Detail                                                                                                                                    |
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | Purpose         | Email, in-app, outbound webhooks                                                                                                          |
-| Async events in | `user.signed_up.v1`, `account.member_added.v1`, `subscription.`*, `invoice.*`, `usage.threshold_crossed.v1`, `account.invitation_sent.v1` |
+| Async events in | `user.signed_up.v1`, `account.member_added.v1`, `subscription.`*, `invoice.`*, `usage.threshold_crossed.v1`, `account.invitation_sent.v1` |
 | Stores          | `PG` for templates + delivery log, `Redis` for rate limit per recipient                                                                   |
 | External        | Email provider                                                                                                                            |
 

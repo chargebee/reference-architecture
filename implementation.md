@@ -28,6 +28,18 @@
 
 - [] Pooled usage limits for teams/enterprise offerings (https://apidocs.chargebee.com/docs/api/usage_summary/usage-summary-object)
 
+
+
+## Best practices broken down by module
+
+- How to handle webhooks
+- How do you cache entitlements?
+- When to use a feature vs "how" to use features
+- Create a how-tos 
+- Set of questions to help user make decisions on how to design/handle scenarios
+- Easy to build out deployable app
+
+
 ## Preferred Stack
 
 * Better Auth with the Chargebee Better Auth plugin
