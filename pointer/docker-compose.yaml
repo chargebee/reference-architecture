@@ -1,0 +1,44 @@
+services:
+  redis:
+    image: redis:8-alpine
+    container_name: pointer-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+
+  postgresql:
+    image: postgres:17-alpine
+    container_name: pointer-postgresql
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: pointer
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+
+  clickhouse:
+    image: clickhouse/clickstack-all-in-one:latest
+    container_name: pointer-clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      CLICKHOUSE_DB: pointer
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+volumes:
+  redis-data:
+  postgresql-data:
+  clickhouse-data:

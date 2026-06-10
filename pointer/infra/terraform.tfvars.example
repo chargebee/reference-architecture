@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars and customize.
+
+aws_profile = "my-aws-profile"
+# region    = "us-east-1"
