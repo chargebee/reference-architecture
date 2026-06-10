@@ -1,0 +1,34 @@
+output "app_url" {
+  description = "Public URL of the pointer app."
+  value       = "https://${local.domain}"
+}
+
+output "alb_dns_name" {
+  description = "Public DNS name of the ALB (Route53 record points here)."
+  value       = aws_lb.app.dns_name
+}
+
+output "ecr_repository_url" {
+  description = "ECR repository URL to push the Next.js image to (tag :latest)."
+  value       = aws_ecr_repository.app.repository_url
+}
+
+output "sqs_queue_url" {
+  description = "URL of the primary SQS queue."
+  value       = aws_sqs_queue.main.url
+}
+
+output "db_secret_arn" {
+  description = "ARN of the Secrets Manager secret holding DB credentials and DATABASE_URL."
+  value       = aws_secretsmanager_secret.db.arn
+}
+
+output "app_secret_arn" {
+  description = "ARN of the Secrets Manager secret holding app secrets (Better Auth, Chargebee). Populate values out-of-band."
+  value       = aws_secretsmanager_secret.app.arn
+}
+
+output "migrate_task_family" {
+  description = "ECS task definition family used to run Better Auth migrations (see scripts/migrate.sh)."
+  value       = aws_ecs_task_definition.migrate.family
+}

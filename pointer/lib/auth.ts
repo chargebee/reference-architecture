@@ -1,6 +1,7 @@
 import { chargebee } from "@chargebee/better-auth";
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
+import { PostgresDialect } from "kysely";
 import {
   admin,
   bearer,
@@ -9,7 +10,7 @@ import {
 } from "better-auth/plugins";
 import Chargebee from "chargebee";
 
-import { pool } from "@/lib/db";
+import { getPool } from "@/lib/db";
 import {
   itemPriceIdFor,
   planLimits,
@@ -26,7 +27,10 @@ const baseURL = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
 export const auth = betterAuth({
   baseURL,
   secret: process.env.BETTER_AUTH_SECRET,
-  database: pool,
+  database: {
+    dialect: new PostgresDialect({ pool: getPool }), // called lazily on 1st query
+    type: "postgres",
+  },
   // The Chargebee plugin only adds `chargebeeCustomerId` to the `user` table
   // when `organization.enabled` is false. We enable both (Personal accounts
   // bill against the user; Team accounts bill against the org), so we have
@@ -43,7 +47,7 @@ export const auth = betterAuth({
   },
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: true,
+    requireEmailVerification: false,
     sendResetPassword: async ({ user, url }) => {
       console.log(
         `[mock-email] password reset for ${user.email}\n  -> ${url}`,
@@ -59,6 +63,7 @@ export const auth = betterAuth({
     user: {
       create: {
         after: async (user) => {
+          const pool = await getPool();
           try {
             const existing = await chargebeeClient.customer.list({
               email: { is: user.email },
@@ -97,7 +102,7 @@ export const auth = betterAuth({
     },
   },
   emailVerification: {
-    sendOnSignUp: true,
+    sendOnSignUp: false,
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url }) => {
       console.log(
@@ -108,7 +113,7 @@ export const auth = betterAuth({
   plugins: [
     organization(),
     admin({
-      adminUserIds: ["jIh2QwEQGQRVnJNaGzlWe1vmMik4ABFL"],
+      adminUserIds: ["dejqHYqBGWgu8LsmIftNOmX3IVDA850M"],
     }),
     twoFactor(),
     bearer(),
@@ -162,6 +167,7 @@ export const auth = betterAuth({
             action === "restore-subscription" ||
             action === "billing-portal"
           ) {
+            const pool = await getPool();
             const { rows } = await pool.query<{ role: string }>(
               `SELECT role FROM "member"
                  WHERE "organizationId" = $1 AND "userId" = $2`,

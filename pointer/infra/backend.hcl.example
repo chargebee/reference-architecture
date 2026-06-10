@@ -1,0 +1,14 @@
+# Copy to backend.hcl and fill in the values for your environment.
+# The S3 bucket must already exist (create it manually before `terraform init`).
+#
+# Usage:
+#   terraform init -backend-config=backend.hcl
+
+bucket  = "REPLACE-ME-tf-state-bucket"
+key     = "pointer/infra/app.tfstate"
+region  = "us-east-1"
+profile = "REPLACE-ME-aws-profile"
+encrypt = true
+
+# Optional: enable state locking with a DynamoDB table you created manually.
+# dynamodb_table = "terraform-state-lock"
