@@ -8,12 +8,17 @@ locals {
   azs            = slice(data.aws_availability_zones.available.names, 0, local.az_count)
 
   # Shared env + secrets injected into every pointer container (app + migrate).
-  container_env = [
-    { name = "NODE_ENV", value = "production" },
-    { name = "AWS_REGION", value = var.region },
-    { name = "SQS_QUEUE_URL", value = aws_sqs_queue.main.url },
-    { name = "BETTER_AUTH_URL", value = "https://${local.domain}" },
-  ]
+  container_env = concat(
+    [
+      { name = "NODE_ENV", value = "production" },
+      { name = "AWS_REGION", value = var.region },
+      { name = "SQS_QUEUE_URL", value = aws_sqs_queue.main.url },
+      { name = "BETTER_AUTH_URL", value = "https://${local.domain}" },
+    ],
+    var.better_auth_trusted_origins == "" ? [] : [
+      { name = "BETTER_AUTH_TRUSTED_ORIGINS", value = var.better_auth_trusted_origins },
+    ],
+  )
 
   container_secrets = [
     {

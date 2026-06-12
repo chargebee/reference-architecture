@@ -63,7 +63,7 @@ resource "aws_secretsmanager_secret_version" "db" {
     host         = aws_db_instance.app.address
     port         = aws_db_instance.app.port
     dbname       = aws_db_instance.app.db_name
-    database_url = "postgresql://${aws_db_instance.app.username}:${random_password.db_master.result}@${aws_db_instance.app.address}:${aws_db_instance.app.port}/${aws_db_instance.app.db_name}?uselibpqcompat=true&sslmode=require"
+    database_url = "postgresql://${aws_db_instance.app.username}:${urlencode(random_password.db_master.result)}@${aws_db_instance.app.address}:${aws_db_instance.app.port}/${aws_db_instance.app.db_name}?uselibpqcompat=true&sslmode=require"
   })
 }
 
