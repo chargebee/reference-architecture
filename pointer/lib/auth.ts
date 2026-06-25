@@ -26,6 +26,7 @@ const baseURL = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
 
 export const auth = betterAuth({
   baseURL,
+  trustedOrigins: ["https://pointer-alb-649910355.us-east-1.elb.amazonaws.com"],
   secret: process.env.BETTER_AUTH_SECRET,
   database: {
     dialect: new PostgresDialect({ pool: getPool }), // called lazily on 1st query

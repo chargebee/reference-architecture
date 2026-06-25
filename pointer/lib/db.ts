@@ -15,7 +15,6 @@ export function getPool(): Promise<Pool> {
   if (cachedPool) return cachedPool;
 
   const databaseUrl = process.env.DATABASE_URL;
-  console.log(`DATABASE_URL: ${databaseUrl}`);
   if (!databaseUrl) {
     throw new Error("DATABASE_URL environment variable is required");
   }
