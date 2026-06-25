@@ -11,6 +11,7 @@ import {
 import Chargebee from "chargebee";
 
 import { getPool } from "@/lib/db";
+import { registerChargebeeWebhookForwarder } from "@/lib/webhooks";
 import {
   itemPriceIdFor,
   planLimits,
@@ -26,7 +27,6 @@ const baseURL = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
 
 export const auth = betterAuth({
   baseURL,
-  trustedOrigins: ["https://pointer-alb-649910355.us-east-1.elb.amazonaws.com"],
   secret: process.env.BETTER_AUTH_SECRET,
   database: {
     dialect: new PostgresDialect({ pool: getPool }), // called lazily on 1st query
@@ -114,7 +114,7 @@ export const auth = betterAuth({
   plugins: [
     organization(),
     admin({
-      adminUserIds: ["dejqHYqBGWgu8LsmIftNOmX3IVDA850M"],
+      adminUserIds: [],
     }),
     twoFactor(),
     bearer(),
@@ -135,6 +135,9 @@ export const auth = betterAuth({
       },
       webhookUsername: process.env.CHARGEBEE_WEBHOOK_USERNAME,
       webhookPassword: process.env.CHARGEBEE_WEBHOOK_PASSWORD,
+      webhookHandler(handler) {
+        registerChargebeeWebhookForwarder(handler);
+      },
 
       // Let Team plans bill against the organization (rather than the user)
       // by passing customerType: "organization" + referenceId: orgId at
