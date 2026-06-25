@@ -6,7 +6,6 @@ To make things easier, each of these topics are actually implemented in code. Th
 
 Regardless of what your tech stack or hosting platform, each how-to covers the functional/non-functional requirements and a production go-live checklist to help you along the journey.
 
-
 ## Topics
 
-1. [Integrating chargebee webhooks](./integrate-chargebee-webhooks.md)
+1. [Integrating chargebee webhooks](./integrating-chargebee-webhooks.md)
