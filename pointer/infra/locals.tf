@@ -1,24 +1,19 @@
 locals {
   name_prefix    = "pointer"
-  domain         = "pointer.localcblabs.com"
-  parent_zone    = "localcblabs.com"
+  domain         = "pointer.chargebee-labs.com"
   container_port = 3000
   vpc_cidr       = "10.20.0.0/16"
   az_count       = 2
   azs            = slice(data.aws_availability_zones.available.names, 0, local.az_count)
 
   # Shared env + secrets injected into every pointer container (app + migrate).
-  container_env = concat(
-    [
-      { name = "NODE_ENV", value = "production" },
-      { name = "AWS_REGION", value = var.region },
-      { name = "SQS_QUEUE_URL", value = aws_sqs_queue.main.url },
-      { name = "BETTER_AUTH_URL", value = "https://${local.domain}" },
-    ],
-    var.better_auth_trusted_origins == "" ? [] : [
-      { name = "BETTER_AUTH_TRUSTED_ORIGINS", value = var.better_auth_trusted_origins },
-    ],
-  )
+  container_env = [
+    { name = "NODE_ENV", value = "production" },
+    { name = "AWS_REGION", value = var.region },
+    { name = "SQS_QUEUE_URL", value = aws_sqs_queue.main.url },
+    { name = "BETTER_AUTH_URL", value = "https://${local.domain}" },
+    { name = "BETTER_AUTH_TRUSTED_ORIGINS", value = "https://${local.domain}" },
+  ]
 
   container_secrets = [
     {

@@ -3,6 +3,3 @@
 aws_profile = "my-aws-profile"
 # region    = "us-east-1"
 
-# Comma-separated extra origins to trust (e.g. ALB DNS, preview domains).
-# BETTER_AUTH_URL is always trusted; only set this if you need additional origins.
-# better_auth_trusted_origins = "https://pointer-alb-1234567890.us-east-1.elb.amazonaws.com"

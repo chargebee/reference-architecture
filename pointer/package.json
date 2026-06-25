@@ -7,9 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "bootstrap:chargebee": "tsx --env-file=.env.local scripts/bootstrap-chargebee.ts"
+    "bootstrap:chargebee": "tsx --env-file=.env.local scripts/bootstrap-chargebee.ts",
+    "worker:chargebee": "tsx --env-file=.env.local workers/chargebee-webhook-worker.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-sqs": "^3.1073.0",
+    "@aws-sdk/credential-providers": "^3.1073.0",
     "@chargebee/better-auth": "^1.1.0",
     "better-auth": "^1.6.11",
     "chargebee": "^3.24.0",
@@ -17,7 +20,8 @@
     "next": "16.2.6",
     "pg": "^8.21.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "sqs-consumer": "^15.0.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -28,7 +32,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
-    "tsx": "^4.22.3",
+    "tsx": "^4.22.4",
     "typescript": "^5"
   }
 }
