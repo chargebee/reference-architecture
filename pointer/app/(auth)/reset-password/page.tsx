@@ -65,17 +65,12 @@ function ResetPasswordForm() {
 
   return (
     <form className="space-y-4" onSubmit={onSubmit} noValidate>
-      <Field
-        label="New password"
-        htmlFor="password"
-        hint="At least 8 characters."
-      >
+      <Field label="New password" htmlFor="password">
         <Input
           id="password"
           name="password"
           type="password"
           autoComplete="new-password"
-          minLength={8}
           required
         />
       </Field>

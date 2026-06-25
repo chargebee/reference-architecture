@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
@@ -38,6 +39,28 @@ export default async function DashboardPage() {
           value={new Date(session.session.expiresAt).toLocaleString()}
         />
       </dl>
+
+      <section className="mt-10">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+          Tools
+        </h2>
+        <Link
+          href="/flow"
+          className="mt-3 flex items-start justify-between gap-4 rounded-lg border border-zinc-200 p-4 transition-colors hover:border-indigo-400 hover:bg-indigo-50/40 dark:border-zinc-800 dark:hover:border-indigo-500 dark:hover:bg-indigo-950/30"
+        >
+          <div>
+            <div className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+              Event flow
+            </div>
+            <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+              Live visualization of the Pointer ↔ Chargebee event pipeline.
+            </p>
+          </div>
+          <span aria-hidden className="text-zinc-400">
+            →
+          </span>
+        </Link>
+      </section>
     </div>
   );
 }

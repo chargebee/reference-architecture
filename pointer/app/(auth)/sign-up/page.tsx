@@ -12,19 +12,16 @@ import {
   Field,
   Input,
   SubmitButton,
-  SuccessText,
 } from "../_components/form-ui";
 
 export default function SignUpPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setInfo(null);
     setPending(true);
 
     const formData = new FormData(event.currentTarget);
@@ -32,23 +29,24 @@ export default function SignUpPage() {
     const email = String(formData.get("email") ?? "");
     const password = String(formData.get("password") ?? "");
 
+    // Email verification is disabled — Better Auth signs the user in
+    // immediately and the session cookie is set, so we can skip the
+    // verify-email detour and drop the user straight on the dashboard.
     const { error: signUpError } = await authClient.signUp.email({
       name,
       email,
       password,
+      callbackURL: "/dashboard",
     });
 
-    setPending(false);
-
     if (signUpError) {
+      setPending(false);
       setError(signUpError.message ?? "Unable to sign up");
       return;
     }
 
-    setInfo(
-      "Account created. Check the dev console for the verification link.",
-    );
-    router.push("/verify-email");
+    router.push("/dashboard");
+    router.refresh();
   }
 
   return (
@@ -89,23 +87,17 @@ export default function SignUpPage() {
           />
         </Field>
 
-        <Field
-          label="Password"
-          htmlFor="password"
-          hint="At least 8 characters."
-        >
+        <Field label="Password" htmlFor="password">
           <Input
             id="password"
             name="password"
             type="password"
             autoComplete="new-password"
-            minLength={8}
             required
           />
         </Field>
 
         <ErrorText>{error}</ErrorText>
-        <SuccessText>{info}</SuccessText>
 
         <SubmitButton pending={pending}>Create account</SubmitButton>
       </form>
