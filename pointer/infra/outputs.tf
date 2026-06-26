@@ -18,6 +18,11 @@ output "sqs_queue_url" {
   value       = aws_sqs_queue.main.url
 }
 
+output "redis_url" {
+  description = "Connection URL for the ElastiCache Redis OSS cluster (VPC-internal)."
+  value       = "redis://${aws_elasticache_cluster.app.cache_nodes[0].address}:${aws_elasticache_cluster.app.cache_nodes[0].port}"
+}
+
 output "db_secret_arn" {
   description = "ARN of the Secrets Manager secret holding DB credentials and DATABASE_URL."
   value       = aws_secretsmanager_secret.db.arn

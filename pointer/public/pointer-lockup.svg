@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 224 64" width="224" height="64" role="img" aria-label="pointer">
+  <g transform="translate(8,8)">
+    <g fill="none" stroke="#6E56CF" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 11 L24 17.5 L30 11"/>
+      <path d="M18 11 L24 17.5 L30 11" transform="rotate(90,24,24)"/>
+      <path d="M18 11 L24 17.5 L30 11" transform="rotate(180,24,24)"/>
+      <path d="M18 11 L24 17.5 L30 11" transform="rotate(270,24,24)"/>
+    </g>
+    <circle cx="24" cy="24" r="2" fill="#6E56CF"/>
+  </g>
+  <text x="70" y="42" font-family="Inter, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="34" font-weight="500" fill="#1B1B2A">pointer</text>
+</svg>

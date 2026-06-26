@@ -8,9 +8,10 @@ import {
   organization,
   twoFactor,
 } from "better-auth/plugins";
-import Chargebee from "chargebee";
+import Chargebee, { WebhookEventType } from "chargebee";
 
 import { getPool } from "@/lib/db";
+import { emit } from "@/lib/events/emit";
 import {
   itemPriceIdFor,
   planLimits,
@@ -49,6 +50,7 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
+    minPasswordLength: 1,
     sendResetPassword: async ({ user, url }) => {
       console.log(
         `[mock-email] password reset for ${user.email}\n  -> ${url}`,
@@ -64,6 +66,11 @@ export const auth = betterAuth({
     user: {
       create: {
         after: async (user) => {
+          await emit("app.user_created", {
+            userId: user.id,
+            email: user.email,
+            name: user.name,
+          });
           const pool = await getPool();
           try {
             const existing = await chargebeeClient.customer.list({
@@ -92,6 +99,14 @@ export const auth = betterAuth({
             console.log(
               `[chargebee] linked customer ${customer.id} to user ${user.id} (${user.email})`,
             );
+            await emit("chargebee.customer_created", {
+              customerId: customer.id,
+              userId: user.id,
+              email: user.email,
+              customerType: "user",
+              origin: "databaseHook",
+              reused: Boolean(found),
+            });
           } catch (err) {
             console.error(
               `[chargebee] failed to create customer for user ${user.id}:`,
@@ -132,6 +147,41 @@ export const auth = betterAuth({
         console.log(
           `[chargebee] created customer ${chargebeeCustomer.id} for user ${user.id} (${user.email})`,
         );
+        await emit("chargebee.customer_created", {
+          customerId: chargebeeCustomer.id,
+          userId: user.id,
+          email: user.email,
+          customerType: "user",
+          origin: "plugin",
+        });
+      },
+      webhookHandler: (handler) => {
+        // Tap every Chargebee webhook into the event bus for the live
+        // visualization. The plugin's own listeners stay in place — Node's
+        // EventEmitter dispatches to all listeners registered for a type.
+        const tap = (eventType: string) => {
+          handler.on(eventType as WebhookEventType, async ({ event }) => {
+            await emit("chargebee.webhook_received", {
+              webhook_event_type: event.event_type,
+              webhook_event_id: event.id,
+              occurred_at: event.occurred_at,
+              content: event.content,
+            });
+          });
+        };
+        for (const value of Object.values(WebhookEventType)) {
+          tap(value);
+        }
+        // Catch-all for event types not present in our SDK enum version.
+        handler.on("unhandled_event", async ({ event }) => {
+          await emit("chargebee.webhook_received", {
+            webhook_event_type: event.event_type,
+            webhook_event_id: event.id,
+            occurred_at: event.occurred_at,
+            unhandled: true,
+            content: event.content,
+          });
+        });
       },
       webhookUsername: process.env.CHARGEBEE_WEBHOOK_USERNAME,
       webhookPassword: process.env.CHARGEBEE_WEBHOOK_PASSWORD,
