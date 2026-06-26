@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="1200" height="420" role="img" aria-label="pointer hero banner">
+  <defs>
+    <linearGradient id="heroGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FBFAFE"/>
+      <stop offset="1" stop-color="#EFEBFB"/>
+    </linearGradient>
+    <g id="fp" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 11 L24 17.5 L30 11"/>
+      <path d="M18 11 L24 17.5 L30 11" transform="rotate(90,24,24)"/>
+      <path d="M18 11 L24 17.5 L30 11" transform="rotate(180,24,24)"/>
+      <path d="M18 11 L24 17.5 L30 11" transform="rotate(270,24,24)"/>
+      <circle cx="24" cy="24" r="2" fill="currentColor" stroke="none"/>
+    </g>
+  </defs>
+
+  <rect width="1200" height="420" fill="url(#heroGrad)"/>
+  <use href="#fp" transform="translate(980,40) scale(7)" style="color:#6E56CF" opacity="0.06"/>
+
+  <use href="#fp" transform="translate(360,118) scale(2.8)" style="color:#6E56CF"/>
+  <text x="498" y="222" font-family="Inter, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="88" font-weight="500" fill="#1B1B2A">pointer</text>
+  <text x="600" y="290" text-anchor="middle" font-family="Inter, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="26" font-weight="400" fill="#6B6B7B">Ask anything — get pointed straight to the answer.</text>
+</svg>
