@@ -1,6 +1,7 @@
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 import { fromIni } from "@aws-sdk/credential-providers";
-import type { WebhookHandler } from "chargebee";
+import type { ChargebeeWebhookEventBus } from "@chargebee/better-auth";
+import type { WebhookEvent } from "chargebee";
 
 declare global {
   // Cache the SQS client across HMR reloads so we don't leak sockets in dev.
@@ -27,36 +28,41 @@ function getSqsClient(): SQSClient {
   return client;
 }
 
-/**
- * Registers a Chargebee webhook listener that forwards every incoming event
- * payload to an SQS queue. Downstream consumers (workers, lambdas, etc.) do
- * the actual fan-out / processing — keeping the webhook endpoint fast and
- * decoupled from business logic.
- */
-export function registerChargebeeWebhookForwarder(handler: WebhookHandler) {
-  // `unhandled_event` fires for any event type that has no specific listener
-  // registered. Since we want to forward _everything_, registering only this
-  // listener captures the full Chargebee event stream.
-  handler.on("unhandled_event", async ({ event }) => {
-    const client = getSqsClient();
-    const queueUrl = process.env.CHARGEBEE_WEBHOOK_SQS_QUEUE_URL!;
-
-    await client.send(
-      new SendMessageCommand({
-        QueueUrl: queueUrl,
-        MessageBody: JSON.stringify(event),
-        // Use the event id for FIFO dedupe; ignored on standard queues.
-        MessageDeduplicationId: queueUrl.endsWith(".fifo")
-          ? (event as { id?: string }).id
-          : undefined,
-        MessageGroupId: queueUrl.endsWith(".fifo")
-          ? "chargebee-webhooks"
-          : undefined,
-      }),
+function getQueueUrl(): string {
+  const queueUrl =
+    process.env.SQS_QUEUE_URL ?? process.env.CHARGEBEE_WEBHOOK_SQS_QUEUE_URL;
+  if (!queueUrl) {
+    throw new Error(
+      "SQS_QUEUE_URL (or CHARGEBEE_WEBHOOK_SQS_QUEUE_URL) environment variable is required",
     );
-  });
-
-  handler.on("error", (error) => {
-    console.error("[chargebee-webhook] handler error:", error);
-  });
+  }
+  return queueUrl;
 }
+
+async function publishChargebeeWebhookEvent(event: WebhookEvent): Promise<void> {
+  const client = getSqsClient();
+  const queueUrl = getQueueUrl();
+
+  await client.send(
+    new SendMessageCommand({
+      QueueUrl: queueUrl,
+      MessageBody: JSON.stringify(event),
+      // Use the event id for FIFO dedupe; ignored on standard queues.
+      MessageDeduplicationId: queueUrl.endsWith(".fifo")
+        ? event.id
+        : undefined,
+      MessageGroupId: queueUrl.endsWith(".fifo") ? "chargebee-webhooks" : undefined,
+    }),
+  );
+}
+
+/**
+ * Event bus passed to the Chargebee plugin's `webhookEventBus` option.
+ *
+ * The plugin validates and parses each incoming webhook, then calls
+ * `publish` instead of running DB-sync hooks inline. The worker consumes
+ * from the same queue and runs those hooks via `createChargebeeWebhookProcessor`.
+ */
+export const chargebeeWebhookEventBus: ChargebeeWebhookEventBus = {
+  publish: publishChargebeeWebhookEvent,
+};
