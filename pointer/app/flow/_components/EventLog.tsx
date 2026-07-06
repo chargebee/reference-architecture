@@ -76,6 +76,9 @@ function badgeClass(source: string): string {
   if (source === "chargebee") {
     return `${base} bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200`;
   }
+  if (source === "worker") {
+    return `${base} bg-violet-100 text-violet-900 dark:bg-violet-950 dark:text-violet-200`;
+  }
   return `${base} bg-indigo-100 text-indigo-900 dark:bg-indigo-950 dark:text-indigo-200`;
 }
 
@@ -83,7 +86,11 @@ function subtitleFor(
   type: string,
   data: Record<string, unknown>,
 ): string | null {
-  if (type === "chargebee.webhook_received") {
+  if (
+    type === "chargebee.webhook_received" ||
+    type === "chargebee.webhook_queued" ||
+    type === "chargebee.webhook_processed"
+  ) {
     const wt = data["webhook_event_type"];
     return typeof wt === "string" ? wt : null;
   }

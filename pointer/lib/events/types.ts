@@ -1,12 +1,14 @@
 // Event envelope mirrors the contract in docs/01-architecture.md §5,
 // trimmed for in-app fanout (no JWT-derived account/user partition keys yet).
 
-export type EventSource = "app" | "chargebee";
+export type EventSource = "app" | "chargebee" | "worker";
 
 export type AppEventType =
   | "app.user_created"
   | "chargebee.customer_created"
-  | "chargebee.webhook_received";
+  | "chargebee.webhook_received"
+  | "chargebee.webhook_queued"
+  | "chargebee.webhook_processed";
 
 export interface AppEvent<TData = Record<string, unknown>> {
   event_id: string;
