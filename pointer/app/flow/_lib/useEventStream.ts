@@ -149,6 +149,8 @@ export function useEventStream() {
         "app.user_created",
         "chargebee.customer_created",
         "chargebee.webhook_received",
+        "chargebee.webhook_queued",
+        "chargebee.webhook_processed",
       ];
       for (const t of namedTypes) {
         es.addEventListener(t, handleMessage as EventListener);

@@ -8,6 +8,9 @@ export type EdgeId =
   | "e_app_cbapi"
   | "e_cbapi_cbwebhook"
   | "e_cbwebhook_app"
+  | "e_app_queue"
+  | "e_queue_worker"
+  | "e_worker_db"
   | "e_app_db";
 
 export type NodeId =
@@ -15,6 +18,8 @@ export type NodeId =
   | "n_app"
   | "n_cbapi"
   | "n_cbwebhook"
+  | "n_queue"
+  | "n_worker"
   | "n_db";
 
 export function edgesForEvent(eventType: string): EdgeId[] {
@@ -25,6 +30,10 @@ export function edgesForEvent(eventType: string): EdgeId[] {
       return ["e_app_cbapi", "e_cbapi_cbwebhook"];
     case "chargebee.webhook_received":
       return ["e_cbwebhook_app"];
+    case "chargebee.webhook_queued":
+      return ["e_app_queue"];
+    case "chargebee.webhook_processed":
+      return ["e_queue_worker", "e_worker_db"];
     default:
       return [];
   }
@@ -38,9 +47,18 @@ export function nodeForEvent(eventType: string): NodeId | null {
       return "n_cbapi";
     case "chargebee.webhook_received":
       return "n_app";
+    case "chargebee.webhook_queued":
+      return "n_queue";
+    case "chargebee.webhook_processed":
+      return "n_worker";
     default:
       return null;
   }
+}
+
+function webhookTag(data: Record<string, unknown>): string | null {
+  const sub = data["webhook_event_type"];
+  return typeof sub === "string" ? sub : null;
 }
 
 // Short, human-friendly tag rendered on the active edge while it pulses.
@@ -49,10 +67,8 @@ export function tagForEvent(
   eventType: string,
   data: Record<string, unknown>,
 ): string {
-  if (eventType === "chargebee.webhook_received") {
-    const sub = data["webhook_event_type"];
-    if (typeof sub === "string") return sub;
-  }
+  const webhook = webhookTag(data);
+  if (webhook) return webhook;
   return eventType;
 }
 
@@ -74,6 +90,10 @@ export function shapeForEvent(eventType: string): ShapeStyle {
       return { shape: "triangle", color: "#f59e0b" }; // amber-500
     case "chargebee.webhook_received":
       return { shape: "square", color: "#10b981" }; // emerald-500
+    case "chargebee.webhook_queued":
+      return { shape: "diamond", color: "#a855f7" }; // violet-500
+    case "chargebee.webhook_processed":
+      return { shape: "circle", color: "#6366f1" }; // indigo-500
     default:
       return { shape: "diamond", color: "#a855f7" }; // violet-500
   }

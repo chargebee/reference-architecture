@@ -3,6 +3,8 @@ import { fromIni } from "@aws-sdk/credential-providers";
 import type { ChargebeeWebhookEventBus } from "@chargebee/better-auth";
 import type { WebhookEvent } from "chargebee";
 
+import { emit } from "@/lib/events/emit";
+
 declare global {
   // Cache the SQS client across HMR reloads so we don't leak sockets in dev.
   var __sqsClient: SQSClient | undefined;
@@ -40,6 +42,20 @@ function getQueueUrl(): string {
 }
 
 async function publishChargebeeWebhookEvent(event: WebhookEvent): Promise<void> {
+  // Tap every validated webhook at publish time for the live /flow visualization.
+  // This replaces the plugin's webhookHandler option, which is not used when
+  // webhookEventBus is configured.
+  await emit(
+    "chargebee.webhook_received",
+    {
+      webhook_event_type: event.event_type,
+      webhook_event_id: event.id,
+      occurred_at: event.occurred_at,
+      content: event.content,
+    },
+    { trace_id: event.id },
+  );
+
   const client = getSqsClient();
   const queueUrl = getQueueUrl();
 
@@ -54,14 +70,27 @@ async function publishChargebeeWebhookEvent(event: WebhookEvent): Promise<void> 
       MessageGroupId: queueUrl.endsWith(".fifo") ? "chargebee-webhooks" : undefined,
     }),
   );
+
+  await emit(
+    "chargebee.webhook_queued",
+    {
+      webhook_event_type: event.event_type,
+      webhook_event_id: event.id,
+      occurred_at: event.occurred_at,
+    },
+    { source: "app", trace_id: event.id },
+  );
 }
 
 /**
  * Event bus passed to the Chargebee plugin's `webhookEventBus` option.
  *
  * The plugin validates and parses each incoming webhook, then calls
- * `publish` instead of running DB-sync hooks inline. The worker consumes
- * from the same queue and runs those hooks via `createChargebeeWebhookProcessor`.
+ * `publish` instead of running DB-sync hooks inline. Each publish emits
+ * `chargebee.webhook_received` and, after a successful SQS send,
+ * `chargebee.webhook_queued` for the live /flow visualization. The worker
+ * consumes from the same queue, runs DB-sync hooks via
+ * `createChargebeeWebhookProcessor`, and emits `chargebee.webhook_processed`.
  */
 export const chargebeeWebhookEventBus: ChargebeeWebhookEventBus = {
   publish: publishChargebeeWebhookEvent,

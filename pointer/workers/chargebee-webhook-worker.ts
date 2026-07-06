@@ -33,6 +33,7 @@ import { Consumer } from "sqs-consumer";
 
 import { auth } from "@/lib/auth";
 import { chargebeePluginOptions } from "@/lib/chargebee-plugin";
+import { emit } from "@/lib/events/emit";
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -78,6 +79,17 @@ const consumer = Consumer.create({
     });
 
     await (await processorPromise).process(event);
+
+    await emit(
+      "chargebee.webhook_processed",
+      {
+        webhook_event_type: event.event_type,
+        webhook_event_id: event.id,
+        occurred_at: event.occurred_at,
+        sqs_message_id: message.MessageId,
+      },
+      { source: "worker", trace_id: event.id },
+    );
 
     // Returning resolves => sqs-consumer deletes the message (ack).
     // Throwing => message stays, becomes visible again after visibilityTimeout,

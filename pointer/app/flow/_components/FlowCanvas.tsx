@@ -27,13 +27,13 @@ const NODES: Array<Node<StationNodeData>> = [
   {
     id: "n_user" satisfies NodeId,
     type: "station",
-    position: { x: 0, y: 220 },
+    position: { x: 0, y: 240 },
     data: { label: "User", accent: "#0ea5e9" },
   },
   {
     id: "n_app" satisfies NodeId,
     type: "station",
-    position: { x: 260, y: 220 },
+    position: { x: 280, y: 240 },
     data: {
       label: "Pointer App",
       subtitle: "Better Auth",
@@ -43,13 +43,13 @@ const NODES: Array<Node<StationNodeData>> = [
   {
     id: "n_cbapi" satisfies NodeId,
     type: "station",
-    position: { x: 260, y: 60 },
+    position: { x: 280, y: 60 },
     data: { label: "Chargebee API", accent: "#f59e0b" },
   },
   {
     id: "n_cbwebhook" satisfies NodeId,
     type: "station",
-    position: { x: 600, y: 220 },
+    position: { x: 560, y: 60 },
     data: {
       label: "Chargebee Webhook",
       subtitle: "inbound",
@@ -57,9 +57,29 @@ const NODES: Array<Node<StationNodeData>> = [
     },
   },
   {
+    id: "n_queue" satisfies NodeId,
+    type: "station",
+    position: { x: 560, y: 240 },
+    data: {
+      label: "SQS Queue",
+      subtitle: "webhook inbox",
+      accent: "#a855f7",
+    },
+  },
+  {
+    id: "n_worker" satisfies NodeId,
+    type: "station",
+    position: { x: 820, y: 240 },
+    data: {
+      label: "Webhook Worker",
+      subtitle: "async consumer",
+      accent: "#6366f1",
+    },
+  },
+  {
     id: "n_db" satisfies NodeId,
     type: "station",
-    position: { x: 260, y: 380 },
+    position: { x: 560, y: 400 },
     data: { label: "Postgres", accent: "#10b981" },
   },
 ];
@@ -96,7 +116,7 @@ const STATIC_EDGES: StaticEdge[] = [
     source: "n_cbapi",
     target: "n_cbwebhook",
     sourceHandle: "s-r",
-    targetHandle: "t-t",
+    targetHandle: "t-l",
     baseLabel: "fan-out",
     smoothstep: true,
   },
@@ -104,17 +124,44 @@ const STATIC_EDGES: StaticEdge[] = [
     id: "e_cbwebhook_app",
     source: "n_cbwebhook",
     target: "n_app",
-    sourceHandle: "s-l",
+    sourceHandle: "s-b",
     targetHandle: "t-r",
     baseLabel: "webhook POST",
+    smoothstep: true,
+  },
+  {
+    id: "e_app_queue",
+    source: "n_app",
+    target: "n_queue",
+    sourceHandle: "s-r",
+    targetHandle: "t-l",
+    baseLabel: "enqueue",
+  },
+  {
+    id: "e_queue_worker",
+    source: "n_queue",
+    target: "n_worker",
+    sourceHandle: "s-r",
+    targetHandle: "t-l",
+    baseLabel: "dequeue",
+  },
+  {
+    id: "e_worker_db",
+    source: "n_worker",
+    target: "n_db",
+    sourceHandle: "s-b",
+    targetHandle: "t-r",
+    baseLabel: "DB sync",
+    smoothstep: true,
   },
   {
     id: "e_app_db",
     source: "n_app",
     target: "n_db",
     sourceHandle: "s-b",
-    targetHandle: "t-t",
+    targetHandle: "t-l",
     baseLabel: "INSERT user",
+    smoothstep: true,
   },
 ];
 
@@ -192,12 +239,14 @@ export function FlowCanvas() {
 function Legend() {
   const items: Array<{
     label: string;
-    shape: "circle" | "triangle" | "square";
+    shape: "circle" | "triangle" | "square" | "diamond";
     color: string;
   }> = [
     { label: "app.user_created", shape: "circle", color: "#0ea5e9" },
     { label: "chargebee.customer_created", shape: "triangle", color: "#f59e0b" },
     { label: "chargebee.webhook_received", shape: "square", color: "#10b981" },
+    { label: "chargebee.webhook_queued", shape: "diamond", color: "#a855f7" },
+    { label: "chargebee.webhook_processed", shape: "circle", color: "#6366f1" },
   ];
   return (
     <div className="absolute bottom-3 left-3 z-10 flex flex-col gap-1 rounded-lg bg-white/80 px-3 py-2 text-[11px] font-medium text-zinc-700 backdrop-blur dark:bg-zinc-900/80 dark:text-zinc-200">
@@ -213,13 +262,20 @@ function Legend() {
                 stroke="#fff"
                 strokeWidth={1}
               />
-            ) : (
+            ) : it.shape === "square" ? (
               <rect
                 x={-5}
                 y={-5}
                 width={10}
                 height={10}
                 rx={1.5}
+                fill={it.color}
+                stroke="#fff"
+                strokeWidth={1}
+              />
+            ) : (
+              <polygon
+                points="0,-7 7,0 0,7 -7,0"
                 fill={it.color}
                 stroke="#fff"
                 strokeWidth={1}

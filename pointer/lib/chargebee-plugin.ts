@@ -1,5 +1,5 @@
 import type { ChargebeeOptions } from "@chargebee/better-auth";
-import Chargebee, { WebhookEventType } from "chargebee";
+import Chargebee from "chargebee";
 
 import { emit } from "@/lib/events/emit";
 import { getPool } from "@/lib/db";
@@ -8,6 +8,7 @@ import {
   planLimits,
   type PlanId,
 } from "@/scripts/catalog";
+import { chargebeeWebhookEventBus } from "./webhooks";
 
 export const chargebeeClient = new Chargebee({
   apiKey: process.env.CHARGEBEE_API_KEY ?? "",
@@ -19,7 +20,8 @@ export const chargebeeClient = new Chargebee({
  *
  * When `webhookEventBus` is set, the HTTP webhook endpoint only validates,
  * parses, and enqueues events. DB sync runs asynchronously in the worker via
- * `createChargebeeWebhookProcessor`.
+ * `createChargebeeWebhookProcessor`. The event bus `publish` hook also emits
+ * `chargebee.webhook_received` for the live /flow visualization.
  */
 export const chargebeePluginOptions = {
   chargebeeClient,
@@ -43,36 +45,9 @@ export const chargebeePluginOptions = {
       origin: "plugin",
     });
   },
-  webhookHandler: (handler) => {
-    // Tap every Chargebee webhook into the event bus for the live
-    // visualization. The plugin's own listeners stay in place — Node's
-    // EventEmitter dispatches to all listeners registered for a type.
-    const tap = (eventType: string) => {
-      handler.on(eventType as WebhookEventType, async ({ event }) => {
-        await emit("chargebee.webhook_received", {
-          webhook_event_type: event.event_type,
-          webhook_event_id: event.id,
-          occurred_at: event.occurred_at,
-          content: event.content,
-        });
-      });
-    };
-    for (const value of Object.values(WebhookEventType)) {
-      tap(value);
-    }
-    // Catch-all for event types not present in our SDK enum version.
-    handler.on("unhandled_event", async ({ event }) => {
-      await emit("chargebee.webhook_received", {
-        webhook_event_type: event.event_type,
-        webhook_event_id: event.id,
-        occurred_at: event.occurred_at,
-        unhandled: true,
-        content: event.content,
-      });
-    });
-  },
   webhookUsername: process.env.CHARGEBEE_WEBHOOK_USERNAME,
   webhookPassword: process.env.CHARGEBEE_WEBHOOK_PASSWORD,
+  webhookEventBus: chargebeeWebhookEventBus,
 
   // Let Team plans bill against the organization (rather than the user)
   // by passing customerType: "organization" + referenceId: orgId at
