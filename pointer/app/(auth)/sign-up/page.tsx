@@ -30,13 +30,13 @@ export default function SignUpPage() {
     const password = String(formData.get("password") ?? "");
 
     // Email verification is disabled — Better Auth signs the user in
-    // immediately and the session cookie is set, so we can skip the
-    // verify-email detour and drop the user straight on the dashboard.
+    // immediately and the session cookie is set, so we send them to plan
+    // selection before the dashboard.
     const { error: signUpError } = await authClient.signUp.email({
       name,
       email,
       password,
-      callbackURL: "/dashboard",
+      callbackURL: "/choose-plan",
     });
 
     if (signUpError) {
@@ -45,7 +45,7 @@ export default function SignUpPage() {
       return;
     }
 
-    router.push("/dashboard");
+    router.push("/choose-plan");
     router.refresh();
   }
 

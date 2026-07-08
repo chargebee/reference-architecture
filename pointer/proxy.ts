@@ -24,5 +24,5 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   // Protect /dashboard and any other authed area; everything else (including /api/auth/*) is public.
-  matcher: ["/dashboard/:path*", "/flow/:path*"],
+  matcher: ["/dashboard/:path*", "/flow/:path*", "/choose-plan"],
 };
