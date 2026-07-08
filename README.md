@@ -4,7 +4,7 @@ The purpose of this repository is to showcase the best practices around integrat
 
 - A collection of in-depth, technical how-tos which cover the Chargebee recommended best practices when integrating various billing and usage related Chargebee products
 
-- A opinionated application built to demonstrate how these concepts translate to code, including a live demo
+- A opinionated, fully functional SaaS application built to demonstrate how these concepts translate to code
 
 ## Audience
 
