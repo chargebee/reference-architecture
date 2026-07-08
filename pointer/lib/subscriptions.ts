@@ -49,12 +49,13 @@ export async function getActiveUserSubscription(
          ON si."subscriptionId" = s.id
         AND si."itemType" = 'plan'
       WHERE s."referenceId" = $1
+        AND s.status = ANY($2)
       ORDER BY s."periodStart" DESC NULLS LAST
-      LIMIT 5`,
-    [userId],
+      LIMIT 1`,
+    [userId, Array.from(ACTIVE_STATUSES)],
   );
 
-  const active = rows.find((row) => ACTIVE_STATUSES.has(row.status));
+  const active = rows[0];
   if (!active) return null;
 
   const planId = planIdFromItemPriceId(active.itemPriceId);
