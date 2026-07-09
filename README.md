@@ -10,7 +10,7 @@ The purpose of this repository is to showcase the best practices around integrat
 
 - Architects and solution consultants who are looking for Chargebee's recommended practices when integrating various products with their platform
 
-- Developers who are looking to validate their integration code and ensure all edge-cases are handled
+- Developers who are looking to validate their integration code and ensure all edge-cases are covered
 
 ## Links
 

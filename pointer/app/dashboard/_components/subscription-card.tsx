@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { InfoBubble } from "@/app/_components/info-bubble";
 import { planNameFromItemPriceId } from "@/lib/self-service-plans";
 
 type Subscription = {
@@ -62,12 +63,29 @@ export function SubscriptionCard({
           </dl>
         </div>
 
-        <Link
-          href="/choose-plan"
-          className="inline-flex h-10 shrink-0 items-center justify-center rounded-full bg-[#6E56CF] px-5 text-sm font-medium text-white transition-colors hover:bg-[#5a45b3]"
-        >
-          Switch plan
-        </Link>
+        <div className="relative shrink-0">
+          <Link
+            href="/choose-plan"
+            className="inline-flex h-10 items-center justify-center rounded-full bg-[#6E56CF] px-5 text-sm font-medium text-white transition-colors hover:bg-[#5a45b3]"
+          >
+            Switch plan
+          </Link>
+          <InfoBubble
+            className="absolute -right-2.5 -top-2.5"
+            title="How-To"
+            label="Topics relevant to subscriptions"
+            links={[
+              {
+                label: "Handle Webhooks",
+                href: "https://www.chargebee.com/docs/2.0/webhook_settings.html",
+              },
+              {
+                label: "Keep entities in sync",
+                href: "https://www.chargebee.com/docs/2.0/sync-process.html",
+              },
+            ]}
+          />
+        </div>
       </div>
     </section>
   );
