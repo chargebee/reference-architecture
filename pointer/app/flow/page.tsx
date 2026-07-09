@@ -1,12 +1,17 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { isAdminRequest } from "@/lib/admin";
 import { auth } from "@/lib/auth";
 import { FlowCanvas } from "./_components/FlowCanvas";
 
 export default async function FlowPage() {
-  const session = await auth.api.getSession({ headers: await headers() });
+  const requestHeaders = await headers();
+  const session = await auth.api.getSession({ headers: requestHeaders });
   if (!session) redirect("/sign-in?from=/flow");
+
+  // /flow is an admin-only view. Non-admins are bounced to the dashboard.
+  if (!(await isAdminRequest(requestHeaders))) redirect("/dashboard");
 
   return (
     <div className="flex h-screen w-full flex-col bg-zinc-50 dark:bg-black">

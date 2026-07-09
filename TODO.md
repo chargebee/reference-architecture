@@ -2,7 +2,9 @@
 
 - [x] Fix better auth Chargebee plugin to follow our best practices in webhook handling and handle the subscription related events using that.
 
-- [ ] Show plans and allow logged in user to subscribe
+- [x] Show plans and allow logged in user to subscribe
+
+- [ ] Clarify the persona we target for this exercise - Architects, Solution consultants
 
 - [ ] Mocking traffic: as a "authorized" user, have a few simulator options in the pointer dashboard, which can:
 
@@ -13,8 +15,10 @@
 
 - [ ] Integrate pricing page using automicpricing
 
+- [ ] Add equivalents of AWS specific components for other popular cloud platforms - GCP, Azure, etc
+
 -  How-Tos:
-    - [ ] How to keep Chargebee entities in sync (subscription/plans/coupons/etc) - what are the schedules for updating them, and any other caching logic
+    - [ ] How to keep Chargebee entities in sync (subscription/plans/coupons/product catalog) - what are the schedules for updating them, and any other caching logic
 
     - [ ] Tracking usage locally - caching, synching with UBB, metered features, lock-out on exceeding limits, etc
 
@@ -23,3 +27,14 @@
     - [ ] Overages - like cursor, how do we have a base usage attached to the plan, but have an extra $100 for additional usage?
 
     - [ ] Pooling usage tokens for team/enterprise plans
+
+    - [ ] Data out for enterprise BA systems
+
+    - [ ] What is the actual checkout experience?? - Use API directly, hosted pages, UI components, etc?
+
+    - [ ] Handling notifications for larger customers who don't want to use chargebee email notifications.
+
+    - [ ] Payment orchestration
+
+
+V1: Checkout, product catalog, entitlements, customer portal

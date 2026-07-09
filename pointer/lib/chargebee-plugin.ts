@@ -57,7 +57,9 @@ export const chargebeePluginOptions = {
 
   subscription: {
     enabled: true,
-    requireEmailVerification: true,
+    // Sign-up does not require email verification in this app, so keep
+    // subscription flows aligned with the auth configuration.
+    requireEmailVerification: false,
     // plan-enterprise is intentionally omitted from the self-service plan
     // list — Enterprise is sales-led with negotiated contracts; the
     // catalog still seeds it so contracts can be wired in the Chargebee

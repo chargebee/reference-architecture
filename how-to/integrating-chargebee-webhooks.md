@@ -71,6 +71,12 @@ sequenceDiagram
 
 * If multiple webhooks are configured for an environment, ensure they don't cause duplication. For example, one endpoint may be for the primary application to respond to billing events, and the other may be for auditing or reporting.
 
+* Since webhook events can be [delivered out of order](https://apidocs.chargebee.com/docs/api/events/event-object#out-of-order-delivery), store and compare the `resource_version` returned in the webhook `content`. Note that `resource_version` has to be individually checked for all resources returned in the webhook content (e.g. `content.customer.resource_version`, `content.subscription.resource_version`)
+
+
+## Implementation notes
+
+
 
 ## Go-live checklist
 
@@ -79,4 +85,3 @@ sequenceDiagram
 - [ ] Do you save all validated webhook events to a durable queue or database so it can be processed asynchronously?
 
 - [ ] Are all messages processed with idempotency in mind so that duplicate messages are handled gracefully and in a predictable manner.
-

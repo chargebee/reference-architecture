@@ -3,14 +3,19 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
+import { getActiveUserSubscription } from "@/lib/subscriptions";
 
 import { SignOutButton } from "../_components/sign-out-button";
+import { SubscriptionCard } from "./_components/subscription-card";
 
 export default async function DashboardPage() {
   // The proxy already redirects unauthenticated requests, but we re-verify
   // here against the DB because proxy only checks cookie presence.
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/sign-in?from=/dashboard");
+
+  const subscription = await getActiveUserSubscription(session.user.id);
+  if (!subscription) redirect("/choose-plan");
 
   return (
     <div className="mx-auto w-full max-w-2xl px-6 py-16">
@@ -24,6 +29,10 @@ export default async function DashboardPage() {
           </p>
         </div>
         <SignOutButton />
+      </div>
+
+      <div className="mt-8">
+        <SubscriptionCard subscription={subscription} />
       </div>
 
       <dl className="mt-8 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">

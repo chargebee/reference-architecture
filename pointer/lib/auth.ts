@@ -118,7 +118,10 @@ export const auth = betterAuth({
   plugins: [
     organization(),
     admin({
-      adminUserIds: [],
+      adminUserIds: (process.env.ADMIN_USER_IDS || "")
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean),
     }),
     twoFactor(),
     bearer(),
