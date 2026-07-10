@@ -23,7 +23,6 @@
  */
 
 import { SQSClient } from "@aws-sdk/client-sqs";
-import { fromIni } from "@aws-sdk/credential-providers";
 import {
   createChargebeeWebhookProcessor,
   type ChargebeeWebhookProcessorSource,
@@ -43,18 +42,9 @@ function requireEnv(name: string): string {
   return value;
 }
 
-const queueUrl =
-  process.env.SQS_QUEUE_URL ??
-  requireEnv("CHARGEBEE_WEBHOOK_SQS_QUEUE_URL");
-const region = process.env.AWS_REGION ?? "us-east-1";
-const profile = process.env.AWS_PROFILE;
+const queueUrl = requireEnv("CHARGEBEE_WEBHOOK_SQS_QUEUE_URL");
 
-const sqs = new SQSClient({
-  region,
-  // Only pin a profile-based credential provider when AWS_PROFILE is set;
-  // otherwise fall back to the default chain (env vars / IAM task role).
-  ...(profile ? { credentials: fromIni({ profile }) } : {}),
-});
+const sqs = new SQSClient();
 
 const processorPromise = auth.$context.then((ctx) =>
   createChargebeeWebhookProcessor(chargebeePluginOptions, {
@@ -120,4 +110,4 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 
 consumer.start();
-console.log(`[chargebee-worker] polling ${queueUrl} (region=${region})`);
+console.log(`[chargebee-worker] polling ${queueUrl}`);

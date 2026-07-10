@@ -10,7 +10,7 @@ locals {
   container_env = [
     { name = "NODE_ENV", value = "production" },
     { name = "AWS_REGION", value = var.region },
-    { name = "SQS_QUEUE_URL", value = aws_sqs_queue.main.url },
+    { name = "CHARGEBEE_WEBHOOK_SQS_QUEUE_URL", value = aws_sqs_queue.main.url },
     { name = "REDIS_URL", value = "redis://${aws_elasticache_cluster.app.cache_nodes[0].address}:${aws_elasticache_cluster.app.cache_nodes[0].port}" },
     { name = "BETTER_AUTH_URL", value = "https://${local.domain}" },
     { name = "BETTER_AUTH_TRUSTED_ORIGINS", value = "https://${local.domain}" },
