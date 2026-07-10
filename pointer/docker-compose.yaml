@@ -20,25 +20,26 @@ services:
     volumes:
       - postgresql-data:/var/lib/postgresql
 
-  clickhouse:
-    image: clickhouse/clickstack-all-in-one:latest
-    container_name: pointer-clickhouse
+  localstack:
+    # Pinned to 4.14.0, the last release before LocalStack consolidated into a
+    # single image (2026.03.0+) that requires a mandatory auth token to boot.
+    # This version runs SQS fully offline with no account/token. Do not bump to
+    # a 2026.x tag unless you're prepared to supply LOCALSTACK_AUTH_TOKEN.
+    image: localstack/localstack:4.14.0
+    container_name: pointer-localstack
     ports:
-      - "8123:8123"
-      - "9000:9000"
+      - "4566:4566"
     environment:
-      CLICKHOUSE_DB: pointer
-      CLICKHOUSE_USER: default
-      CLICKHOUSE_PASSWORD: clickhouse
-      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+      SERVICES: sqs
+      DEBUG: 0
+      AWS_DEFAULT_REGION: us-east-1
     volumes:
-      - clickhouse-data:/var/lib/clickhouse
-    ulimits:
-      nofile:
-        soft: 262144
-        hard: 262144
+      - localstack-data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Creates the Chargebee webhook queue + DLQ on startup (mirrors infra/sqs.tf).
+      - ./docker/localstack/init-sqs.sh:/etc/localstack/init/ready.d/init-sqs.sh
 
 volumes:
   redis-data:
   postgresql-data:
-  clickhouse-data:
+  localstack-data:

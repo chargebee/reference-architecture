@@ -21,7 +21,7 @@ sequenceDiagram
     activate app
     note over app: Validate basic auth
     app->>queue: Store message
-    note over app: Message processed <br>successfully?
+    note over app: Message stored <br>successfully?
     alt Error
         app->>cb: HTTP 5xx (Retry)
         cb-->>app: Scheduled retry
@@ -71,8 +71,11 @@ sequenceDiagram
 
 * If multiple webhooks are configured for an environment, ensure they don't cause duplication. For example, one endpoint may be for the primary application to respond to billing events, and the other may be for auditing or reporting.
 
-* Since webhook events can be [delivered out of order](https://apidocs.chargebee.com/docs/api/events/event-object#out-of-order-delivery), store and compare the `resource_version` returned in the webhook `content`. Note that `resource_version` has to be individually checked for all resources returned in the webhook content (e.g. `content.customer.resource_version`, `content.subscription.resource_version`)
+* Since webhook events can be [delivered out of order](https://apidocs.chargebee.com/docs/api/events/event-object#out-of-order-delivery), store and compare the `resource_version` returned in the webhook `content`. Note that `resource_version` has to be individually checked for all resources returned in the webhook content (e.g. `content.customer.resource_version`, `content.subscription.resource_version`) -- EXPAND (may receive an invoice before the customer) - if there are dependencies between resources, you should be able to handle it
 
+* `event_id` is the unique identifier 
+
+* Integration verifier -- use LLM ( review prompt)
 
 ## Implementation notes
 

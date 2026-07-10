@@ -18,9 +18,9 @@
 - [ ] Add equivalents of AWS specific components for other popular cloud platforms - GCP, Azure, etc
 
 -  How-Tos:
-    - [ ] How to keep Chargebee entities in sync (subscription/plans/coupons/product catalog) - what are the schedules for updating them, and any other caching logic
+    - [ ] (v1) How to keep Chargebee entities in sync (subscription/plans/coupons/product catalog) - what are the schedules for updating them, and any other caching logic
 
-    - [ ] Tracking usage locally - caching, synching with UBB, metered features, lock-out on exceeding limits, etc
+    - [ ] (v1) Tracking usage locally - caching, synching with UBB, metered features, lock-out on exceeding limits, etc
 
     - [ ] Prepaid credits - where does it fit, how does it play well with the UBB usages, etc
 
@@ -30,7 +30,7 @@
 
     - [ ] Data out for enterprise BA systems
 
-    - [ ] What is the actual checkout experience?? - Use API directly, hosted pages, UI components, etc?
+    - [ ] (v1) What is the actual checkout experience?? - Use API directly, hosted pages, UI components, etc?
 
     - [ ] Handling notifications for larger customers who don't want to use chargebee email notifications.
 

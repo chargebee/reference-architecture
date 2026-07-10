@@ -1,5 +1,4 @@
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
-import { fromIni } from "@aws-sdk/credential-providers";
 import type { ChargebeeWebhookEventBus } from "@chargebee/better-auth";
 import type { WebhookEvent } from "chargebee";
 
@@ -13,16 +12,7 @@ declare global {
 function getSqsClient(): SQSClient {
   if (globalThis.__sqsClient) return globalThis.__sqsClient;
 
-  const region = process.env.AWS_REGION ?? "us-east-1";
-  const profile = process.env.AWS_PROFILE;
-
-  const client = new SQSClient({
-    region,
-    // Only pin a profile-based credential provider when AWS_PROFILE is set.
-    // Otherwise fall back to the default chain (env vars, IAM role, etc.)
-    // so this works unchanged in ECS/EC2/Lambda.
-    ...(profile ? { credentials: fromIni({ profile }) } : {}),
-  });
+  const client = new SQSClient();
 
   if (process.env.NODE_ENV !== "production") {
     globalThis.__sqsClient = client;
@@ -31,11 +21,10 @@ function getSqsClient(): SQSClient {
 }
 
 function getQueueUrl(): string {
-  const queueUrl =
-    process.env.SQS_QUEUE_URL ?? process.env.CHARGEBEE_WEBHOOK_SQS_QUEUE_URL;
+  const queueUrl = process.env.CHARGEBEE_WEBHOOK_SQS_QUEUE_URL;
   if (!queueUrl) {
     throw new Error(
-      "SQS_QUEUE_URL (or CHARGEBEE_WEBHOOK_SQS_QUEUE_URL) environment variable is required",
+      "CHARGEBEE_WEBHOOK_SQS_QUEUE_URL environment variable is required",
     );
   }
   return queueUrl;
