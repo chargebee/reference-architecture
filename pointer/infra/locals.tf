@@ -41,5 +41,9 @@ locals {
       name      = "CHARGEBEE_WEBHOOK_PASSWORD"
       valueFrom = "${aws_secretsmanager_secret.app.arn}:chargebee_webhook_password::"
     },
+    {
+      name      = "ADMIN_USER_IDS"
+      valueFrom = "${aws_secretsmanager_secret.app.arn}:admin_user_ids::"
+    }
   ]
 }
