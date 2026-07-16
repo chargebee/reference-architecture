@@ -73,17 +73,14 @@ sequenceDiagram
 
 * Since webhook events can be [delivered out of order](https://apidocs.chargebee.com/docs/api/events/event-object#out-of-order-delivery), store and compare the `resource_version` returned in the webhook `content`. Note that `resource_version` has to be individually checked for all resources returned in the webhook content (e.g. `content.customer.resource_version`, `content.subscription.resource_version`). Out-of-order delivery also means an event can arrive **before another event it depends on** (for example, a `payment_succeeded` referencing a customer whose `customer_created` hasn't been processed yet). Your worker must be able to handle these dependency gaps — see [Handling out-of-order and dependent events](#handling-out-of-order-and-dependent-events) below.
 
-* `event_id` is the unique identifier 
 
-* Integration verifier -- use LLM ( review prompt)
-
-## Handling out-of-order and dependent events
+### Handling out-of-order and dependent events
 
 Chargebee delivers events with **at-least-once** semantics and **no ordering guarantee**. Most of the time events arrive in roughly the order they occurred, but network retries and independent delivery mean a later event can overtake an earlier one. This becomes a correctness problem when events have **dependencies** between resources.
 
 The classic case: a `payment_succeeded` (or `subscription_created`) arrives and references a customer whose `customer_created` event **hasn't been processed yet**. The worker cannot attach the payment to a customer that doesn't exist in your database.
 
-The important thing is what you should *not* do:
+To handle such cases, the webhook handler must implement the following rules:
 
 - **Don't drop the event.** The dependency will likely arrive moments later.
 - **Don't return a 5xx to Chargebee** just because your worker isn't ready — you've already durably stored the message, so acknowledge receipt and let the worker retry from the queue.
@@ -129,9 +126,7 @@ sequenceDiagram
     deactivate worker
 ```
 
-### How long / how many times to retry
-
-Two independent knobs make this robust, and they answer "how patient should the queue be?":
+#### Retry semantics
 
 - **Retry with backoff — how many attempts.** On each unacknowledged delivery the message becomes available again after a *backoff delay*, and its delivery/receive count is incremented. After a configured **maximum delivery count**, the message is routed to a [dead letter queue](https://en.wikipedia.org/wiki/Dead_letter_queue) instead of being retried forever. Prefer an **increasing backoff** keyed off the delivery count so a dependency-not-ready message waits progressively longer (seconds → minutes) between attempts rather than burning all its retries in a burst.
 
