@@ -90,21 +90,22 @@ resource "aws_iam_role" "task" {
 }
 
 data "aws_iam_policy_document" "task_sqs" {
+  # Main queue: receive/ack/backoff.
   statement {
     actions = [
-      "sqs:SendMessage",
       "sqs:ReceiveMessage",
       "sqs:DeleteMessage",
       "sqs:GetQueueAttributes",
       "sqs:GetQueueUrl",
       "sqs:ChangeMessageVisibility",
     ]
-    # Main queue for receive/ack/backoff; DLQ so the worker can route poison
-    # messages there explicitly (sqs:SendMessage).
-    resources = [
-      aws_sqs_queue.main.arn,
-      aws_sqs_queue.dlq.arn,
-    ]
+    resources = [aws_sqs_queue.main.arn]
+  }
+
+  # DLQ: worker only routes poison messages there explicitly.
+  statement {
+    actions   = ["sqs:SendMessage"]
+    resources = [aws_sqs_queue.dlq.arn]
   }
 }
 

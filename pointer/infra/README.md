@@ -24,6 +24,7 @@ pointer/infra/
 | DNS | A-alias record `pointer.localcblabs.com` -> ALB |
 | ECR | `pointer-app` repo (AES256, scan-on-push) |
 | ECS | `pointer-cluster`, `pointer-app` Fargate service (1 task, 512 CPU / 1024 MiB, port 3000) |
+| ECS (worker) | `pointer-worker` Fargate service (Chargebee webhook SQS consumer, 256 CPU / 512 MiB, no ALB) with queue-depth autoscaling (`pointer-worker` log group) |
 | RDS | `pointer-db` Postgres (latest default version), `db.t4g.micro`, single-AZ, encrypted at rest, TLS enforced |
 | Secrets | `pointer-db-credentials` (auto-generated DB password) and `pointer-app-secrets` (app/Chargebee secrets, populated out-of-band) |
 | SQS | `pointer-queue` + `pointer-dlq` (SSE on both, maxReceiveCount=5) |
@@ -86,11 +87,13 @@ REPO=$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/pointer-app
 aws --profile <profile> ecr get-login-password --region $REGION \
   | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com
 
-# From the Next.js app root (pointer/) — build both image tags:
-#   :latest         -> slim runtime image (Next.js standalone)
+# From the Next.js app root (pointer/) — build all image tags:
+#   :latest         -> slim runtime image (Next.js standalone) for pointer-app
 #   :migrate-latest -> full builder image used by the migration task
+#   :worker-latest  -> full builder image used by the webhook worker service
 docker buildx build --platform linux/arm64 -t $REPO:latest                   --push .
 docker buildx build --platform linux/arm64 -t $REPO:migrate-latest --target builder --push .
+docker buildx build --platform linux/arm64 -t $REPO:worker-latest  --target builder --push .
 
 # 3. Apply the rest
 terraform apply
@@ -101,9 +104,10 @@ When `apply` completes, outputs include `app_url`, `alb_dns_name`, `ecr_reposito
 ## Deploying a new image
 
 ```bash
-# 1. Build & push both image tags
+# 1. Build & push all image tags
 docker buildx build --platform linux/arm64 -t $REPO:latest                   --push .
 docker buildx build --platform linux/arm64 -t $REPO:migrate-latest --target builder --push .
+docker buildx build --platform linux/arm64 -t $REPO:worker-latest  --target builder --push .
 
 # 2. Run Better Auth migrations against the new schema
 AWS_PROFILE=poc ./scripts/migrate.sh
@@ -112,6 +116,12 @@ AWS_PROFILE=poc ./scripts/migrate.sh
 aws --profile poc ecs update-service \
   --cluster pointer-cluster \
   --service pointer-app \
+  --force-new-deployment
+
+# 4. Roll the worker service onto the new :worker-latest image
+aws --profile poc ecs update-service \
+  --cluster pointer-cluster \
+  --service pointer-worker \
   --force-new-deployment
 ```
 
@@ -136,6 +146,37 @@ aws --profile poc logs tail /ecs/pointer-app-migrate --since 10m --follow
 ECS → `pointer-cluster` → **Tasks** tab → **Run new task** → Launch type **Fargate**, Task definition family **pointer-app-migrate**, latest revision. Under Networking, pick the same subnets and security group as the `pointer-app` service (Assign public IP: **enabled**). Click **Create**. Watch the task in **Tasks**; check logs at `/ecs/pointer-app-migrate`.
 
 Run migrations **before** rolling the app service so the new schema is in place when new app tasks come up.
+
+## Chargebee webhook worker
+
+The webhook ingress endpoint (in `pointer-app`) only validates, enqueues to SQS, and returns `2xx`. The actual DB sync runs in a **separate** long-running service, `pointer-worker`, so it scales on webhook backlog independently of request-serving capacity and can't degrade the web tier.
+
+Like the migrate task, it runs the Dockerfile `builder` image (tag `:worker-latest`) — the slim `:latest` standalone image doesn't ship `tsx`, the plugin, or the full `node_modules` the worker needs. Its command is `npx tsx workers/chargebee-webhook-worker.ts`. It reuses the app's task role (already scoped to `ReceiveMessage`/`DeleteMessage`/`ChangeMessageVisibility` on the main queue and `SendMessage` on the DLQ), the shared ECS security group, and the same env/secrets.
+
+**Autoscaling** is driven by the main queue depth (`ApproximateNumberOfMessagesVisible`):
+
+| Behaviour | Trigger | Effect |
+| --- | --- | --- |
+| Scale out | backlog ≥ `worker_scale_out_backlog` (default 100) for 1 min | +1 task, +2 when well above threshold |
+| Scale in | backlog ≤ `worker_scale_in_backlog` (default 10) for 15 min | −1 task |
+| Bounds | `worker_min_count` / `worker_max_count` (default 1 / 10) | floor & ceiling |
+
+Terraform sets the initial `desired_count` (`worker_desired_count`) then ignores drift, so autoscaling owns it thereafter.
+
+**Scale manually** (e.g. to drain a big backlog fast, or pause processing):
+
+```bash
+aws --profile poc ecs update-service \
+  --cluster pointer-cluster \
+  --service pointer-worker \
+  --desired-count 5
+```
+
+**Tail worker logs:**
+
+```bash
+aws --profile poc logs tail /ecs/pointer-worker --since 10m --follow
+```
 
 ## Tear down
 

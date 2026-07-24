@@ -36,7 +36,8 @@ resource "aws_sqs_queue_redrive_allow_policy" "dlq" {
 # re-driven with infra/scripts/redrive-dlq.sh.
 
 resource "aws_sns_topic" "webhook_dlq_alerts" {
-  name = "${local.name_prefix}-webhook-dlq-alerts"
+  name              = "${local.name_prefix}-webhook-dlq-alerts"
+  kms_master_key_id = "alias/aws/sns"
 }
 
 resource "aws_sns_topic_subscription" "webhook_dlq_email" {

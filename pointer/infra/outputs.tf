@@ -42,3 +42,8 @@ output "migrate_task_family" {
   description = "ECS task definition family used to run Better Auth migrations (see scripts/migrate.sh)."
   value       = aws_ecs_task_definition.migrate.family
 }
+
+output "worker_service_name" {
+  description = "ECS service running the Chargebee webhook worker (scale independently of the app)."
+  value       = aws_ecs_service.worker.name
+}
