@@ -28,3 +28,5 @@ awslocal sqs create-queue \
   }'
 
 echo "[init-sqs] created queues: $QUEUE_NAME (redrive -> $DLQ_NAME)"
+echo "[init-sqs] CHARGEBEE_WEBHOOK_SQS_QUEUE_URL=http://localhost:4566/000000000000/${QUEUE_NAME}"
+echo "[init-sqs] CHARGEBEE_WEBHOOK_DLQ_URL=http://localhost:4566/000000000000/${DLQ_NAME}"

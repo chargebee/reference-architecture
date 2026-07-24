@@ -99,7 +99,12 @@ data "aws_iam_policy_document" "task_sqs" {
       "sqs:GetQueueUrl",
       "sqs:ChangeMessageVisibility",
     ]
-    resources = [aws_sqs_queue.main.arn]
+    # Main queue for receive/ack/backoff; DLQ so the worker can route poison
+    # messages there explicitly (sqs:SendMessage).
+    resources = [
+      aws_sqs_queue.main.arn,
+      aws_sqs_queue.dlq.arn,
+    ]
   }
 }
 

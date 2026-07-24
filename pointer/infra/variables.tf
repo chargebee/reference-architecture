@@ -14,3 +14,9 @@ variable "better_auth_trusted_origins" {
   type        = string
   default     = ""
 }
+
+variable "dlq_alert_email" {
+  description = "Email address subscribed to the webhook DLQ CloudWatch alarm (via SNS). Leave empty to skip the subscription and wire an alert channel manually."
+  type        = string
+  default     = ""
+}

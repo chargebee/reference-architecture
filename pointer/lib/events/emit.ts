@@ -1,6 +1,5 @@
 import { v7 as uuidv7 } from "uuid";
 
-import { getEventBus } from "./redis-stream-bus";
 import type { AppEvent, EventSource } from "./types";
 
 interface EmitOptions {
@@ -23,6 +22,12 @@ export async function emit<T extends Record<string, unknown>>(
   };
 
   try {
+    // Lazy-import so the Redis-backed bus (and ioredis) is only pulled in when
+    // an event is actually published. This keeps `redis-stream-bus`/`ioredis`
+    // out of the static import graph of anything that only imports `emit`
+    // (e.g. `lib/auth.ts`), so tools that merely load the auth config — like
+    // the Better Auth CLI's jiti loader — don't have to resolve Redis.
+    const { getEventBus } = await import("./redis-stream-bus");
     await getEventBus().publish(envelope);
   } catch (err) {
     // The bus is a best-effort observation tap; never fail the caller.

@@ -3,6 +3,7 @@ import type { ChargebeeWebhookEventBus } from "@chargebee/better-auth";
 import type { WebhookEvent } from "chargebee";
 
 import { emit } from "@/lib/events/emit";
+import { versionedResources } from "@/lib/webhooks/webhook-guards";
 
 declare global {
   // Cache the SQS client across HMR reloads so we don't leak sockets in dev.
@@ -41,6 +42,13 @@ async function publishChargebeeWebhookEvent(event: WebhookEvent): Promise<void> 
       webhook_event_id: event.id,
       occurred_at: event.occurred_at,
       content: event.content,
+      // Surface per-resource versions so the /flow view can visualize
+      // out-of-order delivery. The worker uses these for staleness checks.
+      resource_versions: versionedResources(event).map((r) => ({
+        resource_type: r.resourceType,
+        resource_id: r.resourceId,
+        resource_version: r.resourceVersion,
+      })),
     },
     { trace_id: event.id },
   );
