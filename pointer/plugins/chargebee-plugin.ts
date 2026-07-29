@@ -8,7 +8,7 @@ import {
   planLimits,
   type PlanId,
 } from "@/scripts/catalog";
-import { chargebeeWebhookEventBus } from "./webhooks";
+import { chargebeeWebhookEventBus } from "../lib/webhooks";
 
 export const chargebeeClient = new Chargebee({
   apiKey: process.env.CHARGEBEE_API_KEY ?? "",

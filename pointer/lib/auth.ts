@@ -9,9 +9,10 @@ import {
   twoFactor,
 } from "better-auth/plugins";
 
-import { chargebeeClient, chargebeePluginOptions } from "@/lib/chargebee-plugin";
+import { chargebeeClient, chargebeePluginOptions } from "@/plugins/chargebee-plugin";
 import { getPool } from "@/lib/db";
 import { emit } from "@/lib/events/emit";
+import { webhookCorrectnessPlugin } from "@/plugins/webhook-plugin";
 
 const baseURL = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
 
@@ -126,6 +127,9 @@ export const auth = betterAuth({
     twoFactor(),
     bearer(),
     chargebee(chargebeePluginOptions),
+    // Registers the chargebee_resource_version table so the Better Auth CLI
+    // migrate/generate manages it alongside the core + plugin schema.
+    webhookCorrectnessPlugin,
     // nextCookies must be the LAST plugin so it can wrap responses from server actions.
     nextCookies(),
   ],

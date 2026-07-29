@@ -18,6 +18,11 @@ output "sqs_queue_url" {
   value       = aws_sqs_queue.main.url
 }
 
+output "sqs_dlq_url" {
+  description = "URL of the webhook dead-letter queue (poison + exhausted-retry messages)."
+  value       = aws_sqs_queue.dlq.url
+}
+
 output "redis_url" {
   description = "Connection URL for the ElastiCache Redis OSS cluster (VPC-internal)."
   value       = "redis://${aws_elasticache_cluster.app.cache_nodes[0].address}:${aws_elasticache_cluster.app.cache_nodes[0].port}"
@@ -36,4 +41,9 @@ output "app_secret_arn" {
 output "migrate_task_family" {
   description = "ECS task definition family used to run Better Auth migrations (see scripts/migrate.sh)."
   value       = aws_ecs_task_definition.migrate.family
+}
+
+output "worker_service_name" {
+  description = "ECS service running the Chargebee webhook worker (scale independently of the app)."
+  value       = aws_ecs_service.worker.name
 }

@@ -136,7 +136,15 @@ Aim to **distinguish a "dependency not ready" error (retry patiently) from a "po
 
 ## Implementation notes
 
+The [`pointer`](../pointer/) app implements webhooks using the Better Auth Chargebee plugin. The HTTP webhook endpoint is setup by the plugin at `/api/auth/chargebee/webhook`. It validates basic auth, parses the event, and submits the event to the `webhookEventBus` instead of running DB sync inline. The bus enqueues the raw event to an SQS queue and returns `2xx`. A standalone worker long-polls that queue and runs the plugin's DB-sync hooks per event.
 
+- [`pointer/lib/webhooks.ts`](../pointer/lib/webhooks.ts) — the `webhookEventBus.publish` implementation. Runs synchronously in the request path: sends the validated event to SQS (using the event `id` as the FIFO dedupe key) so the endpoint can respond fast and durably.
+
+- [`pointer/workers/chargebee-webhook-worker.ts`](../pointer/workers/chargebee-webhook-worker.ts) — the async worker. Uses `sqs-consumer` to poll the queue and `createChargebeeWebhookProcessor` to apply DB sync. Returning from the handler acks (deletes) the message; throwing leaves it to become visible again and, after `maxReceiveCount`, routes it to the DLQ. Scales horizontally by running more processes.
+
+- [`pointer/infra/sqs.tf`](../pointer/infra/sqs.tf) — the durable queue, dead-letter queue, and redrive policy (`maxReceiveCount = 5`). Main queue retention is 4 days; DLQ retention is 14 days — the out-of-order safety margin.
+
+Idempotency and out-of-order handling come from the queue semantics (SQS at-least-once + visibility timeout prevents double processing) plus the plugin's `resource_version`-aware upserts. A dependency-not-ready case is handled by throwing so SQS redelivers after the visibility timeout, and poison messages fall through to the DLQ after 5 attempts.
 
 ## Go-live checklist
 
