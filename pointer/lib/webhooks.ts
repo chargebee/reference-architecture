@@ -1,35 +1,10 @@
-import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
+import { SendMessageCommand } from "@aws-sdk/client-sqs";
 import type { ChargebeeWebhookEventBus } from "@chargebee/better-auth";
 import type { WebhookEvent } from "chargebee";
 
 import { emit } from "@/lib/events/emit";
+import { getSqsClient, getWebhookQueueUrl, isFifoQueue } from "@/lib/queue";
 import { versionedResources } from "@/lib/webhooks/webhook-guards";
-
-declare global {
-  // Cache the SQS client across HMR reloads so we don't leak sockets in dev.
-  var __sqsClient: SQSClient | undefined;
-}
-
-function getSqsClient(): SQSClient {
-  if (globalThis.__sqsClient) return globalThis.__sqsClient;
-
-  const client = new SQSClient();
-
-  if (process.env.NODE_ENV !== "production") {
-    globalThis.__sqsClient = client;
-  }
-  return client;
-}
-
-function getQueueUrl(): string {
-  const queueUrl = process.env.CHARGEBEE_WEBHOOK_SQS_QUEUE_URL;
-  if (!queueUrl) {
-    throw new Error(
-      "CHARGEBEE_WEBHOOK_SQS_QUEUE_URL environment variable is required",
-    );
-  }
-  return queueUrl;
-}
 
 async function publishChargebeeWebhookEvent(event: WebhookEvent): Promise<void> {
   // Tap every validated webhook at publish time for the live /flow visualization.
@@ -54,17 +29,16 @@ async function publishChargebeeWebhookEvent(event: WebhookEvent): Promise<void> 
   );
 
   const client = getSqsClient();
-  const queueUrl = getQueueUrl();
+  const queueUrl = getWebhookQueueUrl();
+  const fifo = isFifoQueue(queueUrl);
 
   await client.send(
     new SendMessageCommand({
       QueueUrl: queueUrl,
       MessageBody: JSON.stringify(event),
       // Use the event id for FIFO dedupe; ignored on standard queues.
-      MessageDeduplicationId: queueUrl.endsWith(".fifo")
-        ? event.id
-        : undefined,
-      MessageGroupId: queueUrl.endsWith(".fifo") ? "chargebee-webhooks" : undefined,
+      MessageDeduplicationId: fifo ? event.id : undefined,
+      MessageGroupId: fifo ? "chargebee-webhooks" : undefined,
     }),
   );
 

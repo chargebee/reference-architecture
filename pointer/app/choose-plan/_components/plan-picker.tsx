@@ -38,7 +38,8 @@ export function PlanPicker({
 
     const payload = {
       itemPriceId: plan.itemPriceId,
-      successUrl: "/dashboard",
+      successUrl:
+        "/api/entitlements/checkout-complete?callbackURL=%2Fdashboard",
       cancelUrl: mode === "switch" ? "/dashboard" : "/choose-plan",
     };
 

@@ -13,6 +13,8 @@ locals {
     { name = "CHARGEBEE_WEBHOOK_SQS_QUEUE_URL", value = aws_sqs_queue.main.url },
     { name = "CHARGEBEE_WEBHOOK_DLQ_URL", value = aws_sqs_queue.dlq.url },
     { name = "REDIS_URL", value = "redis://${aws_elasticache_cluster.app.cache_nodes[0].address}:${aws_elasticache_cluster.app.cache_nodes[0].port}" },
+    { name = "ENTITLEMENTS_CACHE_TTL_SECONDS", value = "300" },
+    { name = "ENTITLEMENTS_SNAPSHOT_TTL_SECONDS", value = "86400" },
     { name = "BETTER_AUTH_URL", value = "https://${local.domain}" },
     { name = "BETTER_AUTH_TRUSTED_ORIGINS", value = "https://${local.domain}" },
   ]

@@ -8,6 +8,8 @@ export type UserSubscription = {
   status: string;
   periodStart: Date | null;
   periodEnd: Date | null;
+  seats: number | null;
+  planQuantity: number;
   itemPriceId: string | null;
   planId: PlanId | null;
   limits: (typeof planLimits)[PlanId] | null;
@@ -27,6 +29,12 @@ function planIdFromItemPriceId(itemPriceId: string | null): PlanId | null {
 export async function getActiveUserSubscription(
   userId: string,
 ): Promise<UserSubscription | null> {
+  return getActiveSubscriptionForReference(userId);
+}
+
+export async function getActiveSubscriptionForReference(
+  referenceId: string,
+): Promise<UserSubscription | null> {
   const pool = await getPool();
   const { rows } = await pool.query<{
     id: string;
@@ -35,6 +43,8 @@ export async function getActiveUserSubscription(
     status: string;
     periodStart: Date | null;
     periodEnd: Date | null;
+    seats: number | null;
+    planQuantity: number | null;
     itemPriceId: string | null;
   }>(
     `SELECT s.id,
@@ -43,6 +53,8 @@ export async function getActiveUserSubscription(
             s.status,
             s."periodStart",
             s."periodEnd",
+            s.seats,
+            si.quantity AS "planQuantity",
             si."itemPriceId"
        FROM subscription s
        LEFT JOIN "subscriptionItem" si
@@ -52,7 +64,7 @@ export async function getActiveUserSubscription(
         AND s.status = ANY($2)
       ORDER BY s."periodStart" DESC NULLS LAST
       LIMIT 1`,
-    [userId, Array.from(ACTIVE_STATUSES)],
+    [referenceId, Array.from(ACTIVE_STATUSES)],
   );
 
   const active = rows[0];
@@ -61,6 +73,7 @@ export async function getActiveUserSubscription(
   const planId = planIdFromItemPriceId(active.itemPriceId);
   return {
     ...active,
+    planQuantity: active.planQuantity ?? active.seats ?? 1,
     planId,
     limits: planId ? planLimits[planId] : null,
   };

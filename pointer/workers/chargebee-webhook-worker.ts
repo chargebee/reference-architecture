@@ -15,6 +15,13 @@
  * idempotent and the `resource_version` guard turns a redelivered/stale event
  * into a skip. See docs/plans/5-webhook-correctness.md.
  *
+ * # App-originated jobs
+ *
+ * The same queue carries entitlement sync jobs enqueued after a subscription
+ * webhook creates its local mirror. They are discriminated by `job` and bypass
+ * the webhook pipeline — there is no Chargebee event to order or verify — but
+ * reuse this loop's retry backoff and DLQ.
+ *
  * # Error handling
  *
  *   - RetryableWebhookError (dependency-not-ready / transient / silent-failure)
@@ -46,6 +53,14 @@ import type { WebhookEvent } from "chargebee";
 import { Consumer } from "sqs-consumer";
 
 import { auth } from "@/lib/auth";
+import {
+  type EntitlementSyncJob,
+  isEntitlementSyncJob,
+} from "@/lib/entitlements/queue";
+import {
+  processEntitlementWebhook,
+  runEntitlementSyncJob,
+} from "@/lib/entitlements/sync";
 import { chargebeePluginOptions } from "@/plugins/chargebee-plugin";
 import { emit } from "@/lib/events/emit";
 import {
@@ -136,6 +151,38 @@ async function routePoison(
   );
 }
 
+// Subscription provisioning (and any other caller of
+// `enqueueEntitlementSync`) queues a mirror refresh here. A failure is always
+// retryable: the job carries no Chargebee event, so replaying it just re-reads
+// Chargebee.
+async function runSyncJob(
+  job: EntitlementSyncJob,
+  message: Message,
+  receiveCount: number,
+): Promise<Message> {
+  console.log("[chargebee-worker]", {
+    messageId: message.MessageId,
+    jobId: job.id,
+    job: job.job,
+    reason: job.reason,
+    subscriptionId: job.chargebeeSubscriptionId,
+    receiveCount,
+  });
+
+  try {
+    await runEntitlementSyncJob(job);
+    return message; // ack
+  } catch (err) {
+    await applyBackoff(message, receiveCount);
+    throw err instanceof RetryableWebhookError
+      ? err
+      : new RetryableWebhookError(
+          err instanceof Error ? err.message : String(err),
+          { cause: err },
+        );
+  }
+}
+
 const consumer = Consumer.create({
   queueUrl,
   sqs,
@@ -151,13 +198,9 @@ const consumer = Consumer.create({
     );
 
     // 1. Parse. Malformed body / missing id is poison — never retryable.
-    let event: WebhookEvent;
+    let body: unknown;
     try {
-      const parsed = JSON.parse(message.Body ?? "{}") as WebhookEvent;
-      if (!parsed || typeof parsed.id !== "string") {
-        throw new Error("missing event id");
-      }
-      event = parsed;
+      body = JSON.parse(message.Body ?? "{}");
     } catch (err) {
       await routePoison(
         message,
@@ -165,6 +208,23 @@ const consumer = Consumer.create({
         new PoisonWebhookError(
           `unparseable webhook body: ${err instanceof Error ? err.message : String(err)}`,
         ),
+      );
+      return message; // ack: poison routed to DLQ
+    }
+
+    // App-originated jobs share the queue; they carry `job`, not `event_type`.
+    // They skip the webhook pipeline: there is no Chargebee event to order,
+    // dedupe, or verify, only a mirror refresh to run.
+    if (isEntitlementSyncJob(body)) {
+      return await runSyncJob(body, message, receiveCount);
+    }
+
+    const event = body as WebhookEvent;
+    if (!event || typeof event.id !== "string") {
+      await routePoison(
+        message,
+        undefined,
+        new PoisonWebhookError("webhook body is missing an event id"),
       );
       return message; // ack: poison routed to DLQ
     }
@@ -198,10 +258,16 @@ const consumer = Consumer.create({
       // 4. Process (plugin DB-sync hooks).
       await (await processorPromise).process(event);
 
-      // 5. Verify-after-process (catches the plugin's swallowed errors).
+      // 5. Verify the plugin's swallowed errors before an entitlement job can
+      // observe a subscription-created event as successfully mirrored.
       await assertProcessed(event);
 
-      // 6. Commit applied versions, emit, ack.
+      // 6. Refresh or queue the resolved entitlement mirror for relevant
+      // events. Subscription creation queues only after step 5 proves its local
+      // row exists.
+      await processEntitlementWebhook(event);
+
+      // 7. Commit applied versions, emit, ack.
       await commitVersions(event);
       await emit(
         "chargebee.webhook_processed",

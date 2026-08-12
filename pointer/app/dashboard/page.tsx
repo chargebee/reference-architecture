@@ -6,16 +6,26 @@ import { auth } from "@/lib/auth";
 import { getActiveUserSubscription } from "@/lib/subscriptions";
 
 import { SignOutButton } from "../_components/sign-out-button";
+import { AccountProvisioning } from "./_components/account-provisioning";
+import { GenerateDemo } from "./_components/generate-demo";
 import { SubscriptionCard } from "./_components/subscription-card";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ provisioning?: string | string[] }>;
+}) {
   // The proxy already redirects unauthenticated requests, but we re-verify
   // here against the DB because proxy only checks cookie presence.
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/sign-in?from=/dashboard");
 
   const subscription = await getActiveUserSubscription(session.user.id);
-  if (!subscription) redirect("/choose-plan");
+  if (!subscription) {
+    const provisioning = (await searchParams).provisioning;
+    if (provisioning === "1") return <AccountProvisioning />;
+    redirect("/choose-plan");
+  }
 
   return (
     <div className="mx-auto w-full max-w-2xl px-6 py-16">
@@ -34,6 +44,8 @@ export default async function DashboardPage() {
       <div className="mt-8">
         <SubscriptionCard subscription={subscription} />
       </div>
+
+      <GenerateDemo />
 
       <dl className="mt-8 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
         <Stat label="User ID" value={session.user.id} />

@@ -34,6 +34,15 @@ export function edgesForEvent(eventType: string): EdgeId[] {
       return ["e_app_queue"];
     case "chargebee.webhook_processed":
       return ["e_queue_worker", "e_worker_db"];
+    case "app.entitlements_sync_queued":
+      return ["e_app_queue"];
+    case "chargebee.entitlements_synced":
+      return ["e_worker_db"];
+    case "app.generate_requested":
+    case "app.generate_denied":
+    case "app.generate_completed":
+    case "app.usage_threshold":
+      return ["e_user_app"];
     default:
       return [];
   }
@@ -51,6 +60,15 @@ export function nodeForEvent(eventType: string): NodeId | null {
       return "n_queue";
     case "chargebee.webhook_processed":
       return "n_worker";
+    case "app.entitlements_sync_queued":
+      return "n_queue";
+    case "chargebee.entitlements_synced":
+      return "n_worker";
+    case "app.generate_requested":
+    case "app.generate_denied":
+    case "app.generate_completed":
+    case "app.usage_threshold":
+      return "n_app";
     default:
       return null;
   }
@@ -69,6 +87,10 @@ export function tagForEvent(
 ): string {
   const webhook = webhookTag(data);
   if (webhook) return webhook;
+  const feature = data["feature_id"];
+  if (typeof feature === "string") return feature;
+  const model = data["model"];
+  if (typeof model === "string") return model;
   return eventType;
 }
 
@@ -94,6 +116,12 @@ export function shapeForEvent(eventType: string): ShapeStyle {
       return { shape: "diamond", color: "#a855f7" }; // violet-500
     case "chargebee.webhook_processed":
       return { shape: "circle", color: "#6366f1" }; // indigo-500
+    case "app.generate_denied":
+      return { shape: "triangle", color: "#ef4444" }; // red-500
+    case "app.generate_requested":
+    case "app.generate_completed":
+    case "app.usage_threshold":
+      return { shape: "circle", color: "#6E56CF" };
     default:
       return { shape: "diamond", color: "#a855f7" }; // violet-500
   }

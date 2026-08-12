@@ -11,7 +11,14 @@ export type AppEventType =
   | "chargebee.webhook_processed"
   | "chargebee.webhook_skipped_stale"
   | "chargebee.webhook_retry_scheduled"
-  | "chargebee.webhook_dead_lettered";
+  | "chargebee.webhook_dead_lettered"
+  | "app.entitlements_sync_queued"
+  | "chargebee.entitlements_synced"
+  | "chargebee.entitlements_sync_failed"
+  | "app.generate_requested"
+  | "app.generate_denied"
+  | "app.generate_completed"
+  | "app.usage_threshold";
 
 export interface AppEvent<TData = Record<string, unknown>> {
   event_id: string;

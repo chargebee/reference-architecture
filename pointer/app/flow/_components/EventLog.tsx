@@ -94,6 +94,23 @@ function subtitleFor(
     const wt = data["webhook_event_type"];
     return typeof wt === "string" ? wt : null;
   }
+  if (type.startsWith("app.generate") || type === "app.usage_threshold") {
+    const model = data["model"];
+    const feature = data["feature_id"];
+    const error = data["error"];
+    return [model, feature, error]
+      .filter((value): value is string => typeof value === "string")
+      .join(" · ");
+  }
+  if (type.includes(".entitlements_")) {
+    return [
+      data["subscription_id"] ?? data["chargebee_subscription_id"],
+      data["trigger"],
+      data["reason"],
+    ]
+      .filter((value): value is string => typeof value === "string")
+      .join(" · ");
+  }
   const email = data["email"];
   const userId = data["userId"];
   if (typeof email === "string") return email;

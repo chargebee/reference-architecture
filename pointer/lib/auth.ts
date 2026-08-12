@@ -12,6 +12,8 @@ import {
 import { chargebeeClient, chargebeePluginOptions } from "@/plugins/chargebee-plugin";
 import { getPool } from "@/lib/db";
 import { emit } from "@/lib/events/emit";
+import { ensureFreeSubscription } from "@/lib/free-subscription";
+import { entitlementsPlugin } from "@/plugins/entitlements-plugin";
 import { webhookCorrectnessPlugin } from "@/plugins/webhook-plugin";
 
 const baseURL = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
@@ -97,9 +99,20 @@ export const auth = betterAuth({
               origin: "databaseHook",
               reused: Boolean(found),
             });
+
+            const freeSubscription = await ensureFreeSubscription(
+              chargebeeClient,
+              {
+                customerId: customer.id,
+                userId: user.id,
+              },
+            );
+            console.log(
+              `[chargebee] ${freeSubscription.created ? "created" : "reused"} free subscription ${freeSubscription.subscription.id} for user ${user.id}`,
+            );
           } catch (err) {
             console.error(
-              `[chargebee] failed to create customer for user ${user.id}:`,
+              `[chargebee] failed to provision billing for user ${user.id}:`,
               err,
             );
           }
@@ -130,6 +143,7 @@ export const auth = betterAuth({
     // Registers the chargebee_resource_version table so the Better Auth CLI
     // migrate/generate manages it alongside the core + plugin schema.
     webhookCorrectnessPlugin,
+    entitlementsPlugin,
     // nextCookies must be the LAST plugin so it can wrap responses from server actions.
     nextCookies(),
   ],

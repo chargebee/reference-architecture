@@ -7,24 +7,29 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
     "bootstrap:chargebee": "tsx --env-file=.env.local scripts/bootstrap-chargebee.ts",
-    "worker:chargebee": "tsx --env-file=.env.local workers/chargebee-webhook-worker.ts"
+    "worker:chargebee": "tsx --env-file=.env.local workers/chargebee-webhook-worker.ts",
+    "reconcile:entitlements": "tsx --env-file=.env.local scripts/reconcile-entitlements.ts"
   },
   "dependencies": {
     "@aws-sdk/client-sqs": "^3.1073.0",
     "@aws-sdk/credential-providers": "^3.1073.0",
     "@chargebee/better-auth": "^1.2.0",
+    "@chargebee/openfeature": "file:../../js-framework-adapters/packages/openfeature",
+    "@openfeature/server-sdk": "^1.23.0",
     "@xyflow/react": "^12.11.1",
     "better-auth": "^1.6.23",
-    "chargebee": "^3.24.0",
-    "ioredis": "^5.11.1",
+    "chargebee": "^3.30.0",
+    "ioredis": "^6.0.0",
     "kysely": "^0.29.2",
     "next": "16.2.6",
     "pg": "^8.21.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "sqs-consumer": "^15.0.2",
-    "uuid": "^14.0.1"
+    "uuid": "^14.0.1",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -36,6 +41,7 @@
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
     "tsx": "^4.22.4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   }
 }

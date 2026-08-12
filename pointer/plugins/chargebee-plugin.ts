@@ -1,7 +1,6 @@
 import type { ChargebeeOptions } from "@chargebee/better-auth";
 import Chargebee from "chargebee";
 
-import { emit } from "@/lib/events/emit";
 import { getPool } from "@/lib/db";
 import {
   itemPriceIdFor,
@@ -25,26 +24,6 @@ export const chargebeeClient = new Chargebee({
  */
 export const chargebeePluginOptions = {
   chargebeeClient,
-  createCustomerOnSignUp: true,
-  getCustomerCreateParams: (user) => {
-    const [firstName, ...rest] = (user.name ?? "").trim().split(/\s+/);
-    return {
-      first_name: firstName || undefined,
-      last_name: rest.join(" ") || undefined,
-    };
-  },
-  onCustomerCreate: async ({ chargebeeCustomer, user }) => {
-    console.log(
-      `[chargebee] created customer ${chargebeeCustomer.id} for user ${user.id} (${user.email})`,
-    );
-    await emit("chargebee.customer_created", {
-      customerId: chargebeeCustomer.id,
-      userId: user.id,
-      email: user.email,
-      customerType: "user",
-      origin: "plugin",
-    });
-  },
   webhookUsername: process.env.CHARGEBEE_WEBHOOK_USERNAME,
   webhookPassword: process.env.CHARGEBEE_WEBHOOK_PASSWORD,
   webhookEventBus: chargebeeWebhookEventBus,

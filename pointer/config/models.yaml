@@ -1,0 +1,20 @@
+basic:
+  - gpt-4o-mini
+  - claude-3-haiku
+advanced:
+  - gpt-4o-mini
+  - claude-3-haiku
+  - gpt-4o
+  - claude-3.5-sonnet
+premium:
+  - gpt-4o-mini
+  - claude-3-haiku
+  - gpt-4o
+  - claude-3.5-sonnet
+  - claude-3.7-sonnet
+  - gpt-5
+enterprise:
+  - "*"
+  - claude-opus
+  - gpt-5-pro
+  - on-prem:*
