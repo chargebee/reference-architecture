@@ -1,8 +1,8 @@
 import type {
   ChargebeeEntitlement,
   ChargebeeEntitlementsSnapshot,
-} from "@chargebee/openfeature";
-import type { EntitlementsStorage } from "@chargebee/openfeature/cache";
+} from "@chargebee/entitlements";
+import type { EntitlementsStorage } from "@chargebee/entitlements/cache";
 import { v7 as uuidv7 } from "uuid";
 
 import { getPool } from "@/lib/db";

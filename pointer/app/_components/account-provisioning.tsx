@@ -28,7 +28,7 @@ export function AccountProvisioning() {
         try {
           if (await localSubscriptionReady()) {
             if (!active) return;
-            router.replace("/dashboard");
+            router.replace("/");
             router.refresh();
             return;
           }
@@ -60,8 +60,8 @@ export function AccountProvisioning() {
           Setting up your free plan
         </h1>
         <p className="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">
-          Chargebee is creating your subscription. Your dashboard will open as
-          soon as its local record arrives; free-tier defaults apply while the
+          Chargebee is creating your subscription. Pointer will open as soon as
+          its local record arrives; free-tier defaults apply while the
           entitlement snapshot finishes loading.
         </p>
 

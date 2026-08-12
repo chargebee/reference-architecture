@@ -28,7 +28,7 @@ vi.mock("./queue", () => ({
   enqueueEntitlementSync: mocks.enqueueEntitlementSync,
 }));
 vi.mock("./provider", () => ({
-  entitlementsProvider: {
+  entitlements: {
     refreshSnapshot: mocks.refreshSnapshot,
     deleteSnapshot: mocks.deleteSnapshot,
   },

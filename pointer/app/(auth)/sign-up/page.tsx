@@ -30,13 +30,13 @@ export default function SignUpPage() {
     const password = String(formData.get("password") ?? "");
 
     // Email verification is disabled, so Better Auth signs the user in
-    // immediately. The dashboard waits for the automatically-created free
+    // immediately. The home page waits for the automatically-created free
     // subscription webhook and entitlement mirror before rendering.
     const { error: signUpError } = await authClient.signUp.email({
       name,
       email,
       password,
-      callbackURL: "/dashboard?provisioning=1",
+      callbackURL: "/?provisioning=1",
     });
 
     if (signUpError) {
@@ -45,7 +45,7 @@ export default function SignUpPage() {
       return;
     }
 
-    router.push("/dashboard?provisioning=1");
+    router.push("/?provisioning=1");
     router.refresh();
   }
 

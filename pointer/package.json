@@ -16,6 +16,7 @@
     "@aws-sdk/client-sqs": "^3.1073.0",
     "@aws-sdk/credential-providers": "^3.1073.0",
     "@chargebee/better-auth": "^1.2.0",
+    "@chargebee/entitlements": "file:../../js-framework-adapters/packages/entitlements",
     "@chargebee/openfeature": "file:../../js-framework-adapters/packages/openfeature",
     "@openfeature/server-sdk": "^1.23.0",
     "@xyflow/react": "^12.11.1",

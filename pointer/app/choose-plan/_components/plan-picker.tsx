@@ -38,9 +38,8 @@ export function PlanPicker({
 
     const payload = {
       itemPriceId: plan.itemPriceId,
-      successUrl:
-        "/api/entitlements/checkout-complete?callbackURL=%2Fdashboard",
-      cancelUrl: mode === "switch" ? "/dashboard" : "/choose-plan",
+      successUrl: "/api/entitlements/checkout-complete?callbackURL=%2F",
+      cancelUrl: mode === "switch" ? "/" : "/choose-plan",
     };
 
     const { error: subscriptionError } =
@@ -72,10 +71,10 @@ export function PlanPicker({
         </div>
         {mode === "switch" ? (
           <Link
-            href="/dashboard"
+            href="/"
             className="text-sm font-medium text-zinc-600 underline-offset-2 hover:text-zinc-900 hover:underline dark:text-zinc-400 dark:hover:text-zinc-100"
           >
-            Back to dashboard
+            Back to Pointer
           </Link>
         ) : null}
       </div>

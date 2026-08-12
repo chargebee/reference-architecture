@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@chargebee/entitlements': file:../../js-framework-adapters/packages/entitlements
+
 importers:
 
   .:
@@ -17,6 +20,9 @@ importers:
       '@chargebee/better-auth':
         specifier: ^1.2.0
         version: 1.2.0(@better-auth/core@1.6.23(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-call@1.3.7(zod@4.4.3))(jose@6.2.3)(kysely@0.29.2)(nanostores@1.3.0))(better-auth@1.6.23(next@16.2.6(@babel/core@7.29.0(supports-color@7.2.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(pg@8.21.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vitest@4.1.10(@types/node@20.19.41)(vite@8.2.1(@types/node@20.19.41)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))))(better-call@1.3.7(zod@4.4.3))(chargebee@3.30.0)
+      '@chargebee/entitlements':
+        specifier: file:../../js-framework-adapters/packages/entitlements
+        version: file:../../js-framework-adapters/packages/entitlements(chargebee@3.30.0)(ioredis@6.0.0(supports-color@7.2.0))(next@16.2.6(@babel/core@7.29.0(supports-color@7.2.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))
       '@chargebee/openfeature':
         specifier: file:../../js-framework-adapters/packages/openfeature
         version: file:../../js-framework-adapters/packages/openfeature(@openfeature/server-sdk@1.23.0(@openfeature/core@1.12.0))(chargebee@3.30.0)(ioredis@6.0.0(supports-color@7.2.0))(next@16.2.6(@babel/core@7.29.0(supports-color@7.2.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))
@@ -359,25 +365,31 @@ packages:
       better-call: ^1.1.7
       chargebee: ^3.23.1
 
+  '@chargebee/entitlements@file:../../js-framework-adapters/packages/entitlements':
+    resolution: {directory: ../../js-framework-adapters/packages/entitlements, type: directory}
+    engines: {node: '>=22'}
+    peerDependencies:
+      chargebee: ^3.30.0
+      ioredis: ^6.0.0
+      next: ^16.0.0
+    peerDependenciesMeta:
+      chargebee:
+        optional: true
+      ioredis:
+        optional: true
+      next:
+        optional: true
+
   '@chargebee/openfeature@file:../../js-framework-adapters/packages/openfeature':
     resolution: {directory: ../../js-framework-adapters/packages/openfeature, type: directory}
     engines: {node: '>=22'}
     peerDependencies:
       '@openfeature/server-sdk': ^1.23.0
       '@openfeature/web-sdk': ^1.10.0
-      chargebee: ^3.30.0
-      ioredis: ^6.0.0
-      next: ^16.0.0
     peerDependenciesMeta:
       '@openfeature/server-sdk':
         optional: true
       '@openfeature/web-sdk':
-        optional: true
-      chargebee:
-        optional: true
-      ioredis:
-        optional: true
-      next:
         optional: true
 
   '@emnapi/core@1.10.0':
@@ -3533,15 +3545,24 @@ snapshots:
       chargebee: 3.30.0
       zod: 4.4.3
 
-  '@chargebee/openfeature@file:../../js-framework-adapters/packages/openfeature(@openfeature/server-sdk@1.23.0(@openfeature/core@1.12.0))(chargebee@3.30.0)(ioredis@6.0.0(supports-color@7.2.0))(next@16.2.6(@babel/core@7.29.0(supports-color@7.2.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))':
+  '@chargebee/entitlements@file:../../js-framework-adapters/packages/entitlements(chargebee@3.30.0)(ioredis@6.0.0(supports-color@7.2.0))(next@16.2.6(@babel/core@7.29.0(supports-color@7.2.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))':
     dependencies:
       server-only: 0.0.1
       zod: 4.4.3
     optionalDependencies:
-      '@openfeature/server-sdk': 1.23.0(@openfeature/core@1.12.0)
       chargebee: 3.30.0
       ioredis: 6.0.0(supports-color@7.2.0)
       next: 16.2.6(@babel/core@7.29.0(supports-color@7.2.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+
+  '@chargebee/openfeature@file:../../js-framework-adapters/packages/openfeature(@openfeature/server-sdk@1.23.0(@openfeature/core@1.12.0))(chargebee@3.30.0)(ioredis@6.0.0(supports-color@7.2.0))(next@16.2.6(@babel/core@7.29.0(supports-color@7.2.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))':
+    dependencies:
+      '@chargebee/entitlements': file:../../js-framework-adapters/packages/entitlements(chargebee@3.30.0)(ioredis@6.0.0(supports-color@7.2.0))(next@16.2.6(@babel/core@7.29.0(supports-color@7.2.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))
+    optionalDependencies:
+      '@openfeature/server-sdk': 1.23.0(@openfeature/core@1.12.0)
+    transitivePeerDependencies:
+      - chargebee
+      - ioredis
+      - next
 
   '@emnapi/core@1.10.0':
     dependencies:

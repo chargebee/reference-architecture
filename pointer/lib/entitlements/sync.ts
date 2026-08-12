@@ -3,7 +3,7 @@ import type { WebhookEvent } from "chargebee";
 import { getPool } from "@/lib/db";
 import { emit } from "@/lib/events/emit";
 
-import { entitlementsProvider } from "./provider";
+import { entitlements } from "./provider";
 import {
   enqueueEntitlementSync,
   type EntitlementSyncJob,
@@ -107,7 +107,7 @@ export async function syncSubscriptionEntitlements(
   const trace = sourceEvent?.id ?? traceId;
   try {
     await assertLocalSubscription(chargebeeSubscriptionId);
-    const result = await entitlementsProvider.refreshSnapshot({
+    const result = await entitlements.refreshSnapshot({
       mode: "subscription",
       subscriptionId: chargebeeSubscriptionId,
     });
@@ -158,7 +158,7 @@ export async function runEntitlementSyncJob(
 async function deleteSubscriptionEntitlements(
   chargebeeSubscriptionId: string,
 ): Promise<void> {
-  await entitlementsProvider.deleteSnapshot({
+  await entitlements.deleteSnapshot({
     mode: "subscription",
     subscriptionId: chargebeeSubscriptionId,
   });

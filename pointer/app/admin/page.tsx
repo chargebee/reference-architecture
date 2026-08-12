@@ -6,46 +6,47 @@ import { auth } from "@/lib/auth";
 import { getActiveUserSubscription } from "@/lib/subscriptions";
 
 import { SignOutButton } from "../_components/sign-out-button";
-import { AccountProvisioning } from "./_components/account-provisioning";
-import { GenerateDemo } from "./_components/generate-demo";
 import { SubscriptionCard } from "./_components/subscription-card";
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ provisioning?: string | string[] }>;
-}) {
-  // The proxy already redirects unauthenticated requests, but we re-verify
-  // here against the DB because proxy only checks cookie presence.
+export default async function AdminPage() {
+  // The layout already enforces the session and the admin permission; this
+  // re-read only supplies the account details rendered below.
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect("/sign-in?from=/dashboard");
+  if (!session) redirect("/sign-in?from=/admin");
 
   const subscription = await getActiveUserSubscription(session.user.id);
-  if (!subscription) {
-    const provisioning = (await searchParams).provisioning;
-    if (provisioning === "1") return <AccountProvisioning />;
-    redirect("/choose-plan");
-  }
 
   return (
     <div className="mx-auto w-full max-w-2xl px-6 py-16">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Dashboard
+            Admin
           </h1>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Protected by Better Auth. You can only see this when signed in.
+            Operator view. Only admin accounts can open this page.
           </p>
         </div>
-        <SignOutButton />
+        <div className="flex items-center gap-3">
+          <Link
+            href="/"
+            className="text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            Back to Pointer
+          </Link>
+          <SignOutButton />
+        </div>
       </div>
 
       <div className="mt-8">
-        <SubscriptionCard subscription={subscription} />
+        {subscription ? (
+          <SubscriptionCard subscription={subscription} />
+        ) : (
+          <section className="rounded-lg border border-zinc-200 p-5 text-sm text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+            No active subscription on this account.
+          </section>
+        )}
       </div>
-
-      <GenerateDemo />
 
       <dl className="mt-8 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
         <Stat label="User ID" value={session.user.id} />
@@ -66,7 +67,7 @@ export default async function DashboardPage({
           Tools
         </h2>
         <Link
-          href="/flow"
+          href="/admin/flow"
           className="mt-3 flex items-start justify-between gap-4 rounded-lg border border-zinc-200 p-4 transition-colors hover:border-indigo-400 hover:bg-indigo-50/40 dark:border-zinc-800 dark:hover:border-indigo-500 dark:hover:bg-indigo-950/30"
         >
           <div>

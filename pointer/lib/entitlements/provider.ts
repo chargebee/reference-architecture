@@ -1,5 +1,6 @@
 import { OpenFeature, type Client } from "@openfeature/server-sdk";
-import { createRedisEntitlementsCache } from "@chargebee/openfeature/cache";
+import { createRedisEntitlementsCache } from "@chargebee/entitlements/cache";
+import { ChargebeeEntitlements } from "@chargebee/entitlements/server";
 import { ChargebeeEntitlementsProvider } from "@chargebee/openfeature/server";
 
 import { emit } from "@/lib/events/emit";
@@ -18,8 +19,11 @@ const SNAPSHOT_TTL_MS =
  * Entitlement lookups walk Redis, then the PostgreSQL mirror, then Chargebee.
  * A request never waits on Chargebee: a subscription with no local snapshot
  * yet resolves to free-tier defaults while the refresh runs in the background.
+ *
+ * Snapshot and cache logic lives on this client; the OpenFeature provider below
+ * is only an adapter over it. Webhook-driven syncs call it directly.
  */
-export const entitlementsProvider = new ChargebeeEntitlementsProvider({
+export const entitlements = new ChargebeeEntitlements({
   chargebeeClient,
   defaultMode: "subscription",
   // The cache TTL bounds how long Redis may lag PostgreSQL: once it lapses the
@@ -47,6 +51,10 @@ export const entitlementsProvider = new ChargebeeEntitlementsProvider({
   onError: (error, { operation, target }) => {
     console.error(`[entitlements] ${operation} failed`, target, error);
   },
+});
+
+export const entitlementsProvider = new ChargebeeEntitlementsProvider({
+  entitlements,
 });
 
 declare global {

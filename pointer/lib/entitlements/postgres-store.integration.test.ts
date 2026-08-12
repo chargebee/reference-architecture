@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { createEntitlementsSnapshot } from "@chargebee/openfeature";
+import { createEntitlementsSnapshot } from "@chargebee/entitlements";
 
 import { getPool } from "@/lib/db";
 

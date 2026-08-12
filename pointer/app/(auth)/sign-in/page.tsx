@@ -17,7 +17,7 @@ import {
 function SignInForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const callbackUrl = params.get("from") ?? "/dashboard";
+  const callbackUrl = params.get("from") ?? "/";
 
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);

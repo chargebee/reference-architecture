@@ -1,9 +1,14 @@
 import { headers } from "next/headers";
 import Image from "next/image";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
+import { isAdminRequest } from "@/lib/admin";
 import { auth } from "@/lib/auth";
+import { getActiveUserSubscription } from "@/lib/subscriptions";
 
+import { AccountProvisioning } from "./_components/account-provisioning";
+import { AskPanel } from "./_components/ask-panel";
 import { SignOutButton } from "./_components/sign-out-button";
 
 const plans = [
@@ -31,9 +36,24 @@ const plans = [
   },
 ];
 
-export default async function Home() {
-  const session = await auth.api.getSession({ headers: await headers() });
+export default async function Home({ searchParams }: PageProps<"/">) {
+  const requestHeaders = await headers();
+  const session = await auth.api.getSession({ headers: requestHeaders });
+  if (!session) return <MarketingHome />;
 
+  // Signing up provisions a free subscription in the background, so a brand
+  // new account lands here before its local record exists.
+  const subscription = await getActiveUserSubscription(session.user.id);
+  if (!subscription) {
+    const { provisioning } = await searchParams;
+    if (provisioning === "1") return <AccountProvisioning />;
+    redirect("/choose-plan");
+  }
+
+  return <SignedInHome isAdmin={await isAdminRequest(requestHeaders)} />;
+}
+
+function SignedInHome({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 font-sans text-zinc-900 dark:bg-black dark:text-zinc-50">
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5">
@@ -45,32 +65,60 @@ export default async function Home() {
           priority
         />
         <nav className="flex items-center gap-3 text-sm font-medium">
-          {session ? (
-            <>
-              <Link
-                href="/dashboard"
-                className="rounded-full bg-[#6E56CF] px-5 py-2 text-white transition-colors hover:bg-[#5a45b3]"
-              >
-                Dashboard
-              </Link>
-              <SignOutButton />
-            </>
-          ) : (
-            <>
-              <Link
-                href="/sign-in"
-                className="rounded-full px-4 py-2 text-zinc-700 transition-colors hover:bg-black/[.05] dark:text-zinc-300 dark:hover:bg-white/[.06]"
-              >
-                Sign in
-              </Link>
-              <Link
-                href="/sign-up"
-                className="rounded-full bg-[#6E56CF] px-5 py-2 text-white transition-colors hover:bg-[#5a45b3]"
-              >
-                Get started
-              </Link>
-            </>
-          )}
+          {isAdmin ? (
+            <Link
+              href="/admin"
+              className="rounded-full px-4 py-2 text-zinc-700 transition-colors hover:bg-black/[.05] dark:text-zinc-300 dark:hover:bg-white/[.06]"
+            >
+              Admin
+            </Link>
+          ) : null}
+          <Link
+            href="/choose-plan"
+            className="rounded-full px-4 py-2 text-zinc-700 transition-colors hover:bg-black/[.05] dark:text-zinc-300 dark:hover:bg-white/[.06]"
+          >
+            Manage plan
+          </Link>
+          <SignOutButton />
+        </nav>
+      </header>
+
+      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10 sm:py-16">
+        <AskPanel />
+      </main>
+
+      <footer className="mx-auto w-full max-w-3xl px-6 pb-10 text-center text-xs text-zinc-400">
+        Pointer is a demonstration of the Chargebee Reference Architecture, not
+        a real product.
+      </footer>
+    </div>
+  );
+}
+
+function MarketingHome() {
+  return (
+    <div className="flex flex-1 flex-col bg-zinc-50 font-sans text-zinc-900 dark:bg-black dark:text-zinc-50">
+      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5">
+        <Image
+          src="/pointer-lockup-white.svg"
+          alt="Pointer"
+          width={140}
+          height={40}
+          priority
+        />
+        <nav className="flex items-center gap-3 text-sm font-medium">
+          <Link
+            href="/sign-in"
+            className="rounded-full px-4 py-2 text-zinc-700 transition-colors hover:bg-black/[.05] dark:text-zinc-300 dark:hover:bg-white/[.06]"
+          >
+            Sign in
+          </Link>
+          <Link
+            href="/sign-up"
+            className="rounded-full bg-[#6E56CF] px-5 py-2 text-white transition-colors hover:bg-[#5a45b3]"
+          >
+            Get started
+          </Link>
         </nav>
       </header>
 
@@ -156,14 +204,14 @@ export default async function Home() {
                   ))}
                 </ul>
                 <Link
-                  href={session ? "/dashboard" : "/sign-up"}
+                  href="/sign-up"
                   className={`mt-7 flex h-11 items-center justify-center rounded-full px-5 text-sm font-medium transition-colors ${
                     plan.featured
                       ? "bg-[#6E56CF] text-white hover:bg-[#5a45b3]"
                       : "border border-black/[.1] hover:bg-black/[.04] dark:border-white/[.15] dark:hover:bg-white/[.06]"
                   }`}
                 >
-                  {session ? "Manage plan" : "Choose " + plan.name}
+                  Choose {plan.name}
                 </Link>
               </div>
             ))}

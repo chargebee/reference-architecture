@@ -8,17 +8,13 @@ import { resolveBillingSubject } from "@/lib/entitlements/subject";
 import { chargebeeClient } from "@/plugins/chargebee-plugin";
 
 function safeCallback(value: string | null): string {
-  return value?.startsWith("/") && !value.startsWith("//")
-    ? value
-    : "/dashboard";
+  return value?.startsWith("/") && !value.startsWith("//") ? value : "/";
 }
 
 export async function GET(request: NextRequest): Promise<Response> {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) {
-    return NextResponse.redirect(
-      new URL("/sign-in?from=/dashboard", request.url),
-    );
+    return NextResponse.redirect(new URL("/sign-in?from=/", request.url));
   }
 
   const callbackURL = safeCallback(

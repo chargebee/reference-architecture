@@ -2,3 +2,9 @@ allowBuilds:
   esbuild: true
   sharp: true
   unrs-resolver: true
+
+# @chargebee/openfeature declares @chargebee/entitlements as `workspace:*`, which
+# cannot resolve when the package is consumed from outside its own monorepo via
+# `file:`. Point it at the same local checkout the direct dependency uses.
+overrides:
+  "@chargebee/entitlements": "file:../../js-framework-adapters/packages/entitlements"
