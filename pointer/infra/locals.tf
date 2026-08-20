@@ -6,7 +6,14 @@ locals {
   az_count       = 2
   azs            = slice(data.aws_availability_zones.available.names, 0, local.az_count)
 
-  # Shared env + secrets injected into every pointer container (app + migrate).
+  ecs_worker_enabled    = var.worker_runtime == "ecs"
+  lambda_worker_enabled = var.worker_runtime == "lambda"
+  worker_queue_visibility_timeout_seconds = local.lambda_worker_enabled ? (
+    var.worker_lambda_timeout_seconds * 6
+  ) : 30
+
+  # Shared env + secrets injected into every pointer container (app + migrate +
+  # the ECS worker when selected).
   container_env = [
     { name = "NODE_ENV", value = "production" },
     { name = "AWS_REGION", value = var.region },
@@ -49,4 +56,17 @@ locals {
       valueFrom = "${aws_secretsmanager_secret.app.arn}:admin_user_ids::"
     }
   ]
+
+  # Lambda reserves AWS_REGION and loads secret values at cold start so secret
+  # material never enters Terraform state or the Lambda environment config.
+  lambda_worker_env = merge(
+    {
+      for item in local.container_env : item.name => item.value
+      if item.name != "AWS_REGION"
+    },
+    {
+      DATABASE_SECRET_ARN = aws_secretsmanager_secret.db.arn
+      APP_SECRET_ARN      = aws_secretsmanager_secret.app.arn
+    },
+  )
 }

@@ -6,7 +6,7 @@
  * `createChargebeeWebhookProcessor`, wrapped in a correctness pipeline that
  * the plugin itself can't provide.
  *
- * # Per-message pipeline (handleMessage)
+ * # Per-message pipeline
  *
  *   parse ─▶ stale/duplicate guard ─▶ dependency pre-check ─▶ process
  *         ─▶ verify-after-process ─▶ commit versions ─▶ ack
@@ -24,12 +24,8 @@
  *
  * # Error handling
  *
- *   - RetryableWebhookError (dependency-not-ready / transient / silent-failure)
- *     -> increasing backoff via ChangeMessageVisibility, then rethrow so
- *        sqs-consumer leaves the message on the queue. After maxReceiveCount=5
- *        SQS auto-routes it to the DLQ.
- *   - PoisonWebhookError (malformed / unprocessable) -> send to the DLQ
- *     explicitly and ack, skipping the retry budget.
+ *   - Retryable/dependency/transient errors get increasing visibility backoff.
+ *   - Poison messages go directly to the DLQ and are acknowledged.
  *   - Unknown errors -> treated as retryable (safer default).
  *
  * # Horizontal scaling
@@ -39,40 +35,12 @@
  *   processing the same message. No leader election required.
  */
 
-import {
-  ChangeMessageVisibilityCommand,
-  SendMessageCommand,
-  SQSClient,
-} from "@aws-sdk/client-sqs";
-import {
-  createChargebeeWebhookProcessor,
-  type ChargebeeWebhookProcessorSource,
-} from "@chargebee/better-auth";
-import type { Message } from "@aws-sdk/client-sqs";
-import type { WebhookEvent } from "chargebee";
+import { SQSClient } from "@aws-sdk/client-sqs";
 import { Consumer } from "sqs-consumer";
 
-import { auth } from "@/lib/auth";
 import {
-  type EntitlementSyncJob,
-  isEntitlementSyncJob,
-} from "@/lib/entitlements/queue";
-import {
-  processEntitlementWebhook,
-  runEntitlementSyncJob,
-} from "@/lib/entitlements/sync";
-import { chargebeePluginOptions } from "@/plugins/chargebee-plugin";
-import { emit } from "@/lib/events/emit";
-import {
-  PoisonWebhookError,
-  RetryableWebhookError,
-} from "@/lib/webhooks/webhook-errors";
-import {
-  assertDependencies,
-  assertProcessed,
-  commitVersions,
-  isEventStale,
-} from "@/lib/webhooks/webhook-guards";
+  createChargebeeWebhookMessageProcessor,
+} from "./chargebee-webhook-processor";
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -86,102 +54,11 @@ const queueUrl = requireEnv("CHARGEBEE_WEBHOOK_SQS_QUEUE_URL");
 const dlqUrl = requireEnv("CHARGEBEE_WEBHOOK_DLQ_URL");
 
 const sqs = new SQSClient();
-
-const processorPromise = auth.$context.then((ctx) =>
-  createChargebeeWebhookProcessor(chargebeePluginOptions, {
-    context: { adapter: ctx.adapter, logger: ctx.logger },
-  } as unknown as ChargebeeWebhookProcessorSource),
-);
-
-// Increasing backoff keyed off the SQS receive count so a dependency-not-ready
-// message waits progressively longer (30s -> 1m -> 2m -> ... capped at 15m)
-// instead of burning its retry budget in a burst.
-function backoffSeconds(receiveCount: number): number {
-  return Math.min(30 * 2 ** Math.max(0, receiveCount - 1), 900);
-}
-
-async function applyBackoff(
-  message: Message,
-  receiveCount: number,
-): Promise<void> {
-  if (!message.ReceiptHandle) return;
-  try {
-    await sqs.send(
-      new ChangeMessageVisibilityCommand({
-        QueueUrl: queueUrl,
-        ReceiptHandle: message.ReceiptHandle,
-        VisibilityTimeout: backoffSeconds(receiveCount),
-      }),
-    );
-  } catch (err) {
-    // Non-fatal: the message just becomes visible again after the default
-    // visibility timeout instead of the backed-off one.
-    console.error("[chargebee-worker] failed to extend visibility", err);
-  }
-}
-
-// Route a poison message straight to the DLQ and ack the main queue. If the
-// DLQ send fails we rethrow so the message is retried rather than lost.
-async function routePoison(
-  message: Message,
-  event: WebhookEvent | undefined,
-  err: unknown,
-): Promise<void> {
-  const reason = err instanceof Error ? err.message : String(err);
-  console.error("[chargebee-worker] poison message -> DLQ", {
-    messageId: message.MessageId,
-    eventId: event?.id,
-    reason,
-  });
-  await emit(
-    "chargebee.webhook_dead_lettered",
-    {
-      webhook_event_type: event?.event_type,
-      webhook_event_id: event?.id,
-      sqs_message_id: message.MessageId,
-      reason,
-    },
-    { source: "worker", trace_id: event?.id },
-  );
-  await sqs.send(
-    new SendMessageCommand({
-      QueueUrl: dlqUrl,
-      MessageBody: message.Body ?? "{}",
-    }),
-  );
-}
-
-// Subscription provisioning (and any other caller of
-// `enqueueEntitlementSync`) queues a mirror refresh here. A failure is always
-// retryable: the job carries no Chargebee event, so replaying it just re-reads
-// Chargebee.
-async function runSyncJob(
-  job: EntitlementSyncJob,
-  message: Message,
-  receiveCount: number,
-): Promise<Message> {
-  console.log("[chargebee-worker]", {
-    messageId: message.MessageId,
-    jobId: job.id,
-    job: job.job,
-    reason: job.reason,
-    subscriptionId: job.chargebeeSubscriptionId,
-    receiveCount,
-  });
-
-  try {
-    await runEntitlementSyncJob(job);
-    return message; // ack
-  } catch (err) {
-    await applyBackoff(message, receiveCount);
-    throw err instanceof RetryableWebhookError
-      ? err
-      : new RetryableWebhookError(
-          err instanceof Error ? err.message : String(err),
-          { cause: err },
-        );
-  }
-}
+const processMessage = createChargebeeWebhookMessageProcessor({
+  queueUrl,
+  dlqUrl,
+  sqs,
+});
 
 const consumer = Consumer.create({
   queueUrl,
@@ -193,123 +70,8 @@ const consumer = Consumer.create({
   // Expose the delivery count so we can drive an increasing retry backoff.
   messageSystemAttributeNames: ["ApproximateReceiveCount"],
   handleMessage: async (message) => {
-    const receiveCount = Number(
-      message.Attributes?.ApproximateReceiveCount ?? "1",
-    );
-
-    // 1. Parse. Malformed body / missing id is poison — never retryable.
-    let body: unknown;
-    try {
-      body = JSON.parse(message.Body ?? "{}");
-    } catch (err) {
-      await routePoison(
-        message,
-        undefined,
-        new PoisonWebhookError(
-          `unparseable webhook body: ${err instanceof Error ? err.message : String(err)}`,
-        ),
-      );
-      return message; // ack: poison routed to DLQ
-    }
-
-    // App-originated jobs share the queue; they carry `job`, not `event_type`.
-    // They skip the webhook pipeline: there is no Chargebee event to order,
-    // dedupe, or verify, only a mirror refresh to run.
-    if (isEntitlementSyncJob(body)) {
-      return await runSyncJob(body, message, receiveCount);
-    }
-
-    const event = body as WebhookEvent;
-    if (!event || typeof event.id !== "string") {
-      await routePoison(
-        message,
-        undefined,
-        new PoisonWebhookError("webhook body is missing an event id"),
-      );
-      return message; // ack: poison routed to DLQ
-    }
-
-    console.log("[chargebee-worker]", {
-      messageId: message.MessageId,
-      eventId: event.id,
-      eventType: event.event_type,
-      occurredAt: event.occurred_at,
-      receiveCount,
-    });
-
-    try {
-      // 2. Stale / duplicate guard.
-      if (await isEventStale(event)) {
-        await emit(
-          "chargebee.webhook_skipped_stale",
-          {
-            webhook_event_type: event.event_type,
-            webhook_event_id: event.id,
-            occurred_at: event.occurred_at,
-          },
-          { source: "worker", trace_id: event.id },
-        );
-        return message; // ack: nothing new to apply
-      }
-
-      // 3. Dependency pre-check (throws RetryableWebhookError when not ready).
-      await assertDependencies(event);
-
-      // 4. Process (plugin DB-sync hooks).
-      await (await processorPromise).process(event);
-
-      // 5. Verify the plugin's swallowed errors before an entitlement job can
-      // observe a subscription-created event as successfully mirrored.
-      await assertProcessed(event);
-
-      // 6. Refresh or queue the resolved entitlement mirror for relevant
-      // events. Subscription creation queues only after step 5 proves its local
-      // row exists.
-      await processEntitlementWebhook(event);
-
-      // 7. Commit applied versions, emit, ack.
-      await commitVersions(event);
-      await emit(
-        "chargebee.webhook_processed",
-        {
-          webhook_event_type: event.event_type,
-          webhook_event_id: event.id,
-          occurred_at: event.occurred_at,
-          sqs_message_id: message.MessageId,
-        },
-        { source: "worker", trace_id: event.id },
-      );
-
-      return message; // ack
-    } catch (err) {
-      if (err instanceof PoisonWebhookError) {
-        await routePoison(message, event, err);
-        return message; // ack: poison routed to DLQ
-      }
-
-      // Retryable + unknown errors: back off and leave the message on the
-      // queue (throwing prevents sqs-consumer from deleting it).
-      await applyBackoff(message, receiveCount);
-      await emit(
-        "chargebee.webhook_retry_scheduled",
-        {
-          webhook_event_type: event.event_type,
-          webhook_event_id: event.id,
-          occurred_at: event.occurred_at,
-          receive_count: receiveCount,
-          backoff_seconds: backoffSeconds(receiveCount),
-          reason: err instanceof Error ? err.message : String(err),
-        },
-        { source: "worker", trace_id: event.id },
-      );
-
-      throw err instanceof RetryableWebhookError
-        ? err
-        : new RetryableWebhookError(
-            err instanceof Error ? err.message : String(err),
-            { cause: err },
-          );
-    }
+    await processMessage(message);
+    return message;
   },
 });
 

@@ -19,6 +19,12 @@
 
 # production
 /build
+/dist
+/vendor/*
+!/vendor/README.md
+
+# terraform local data
+**/.terraform*/
 
 # misc
 .DS_Store

@@ -31,6 +31,17 @@ resource "aws_vpc_security_group_ingress_rule" "db_from_ecs" {
   ip_protocol                  = "tcp"
 }
 
+resource "aws_vpc_security_group_ingress_rule" "db_from_lambda_worker" {
+  count = local.lambda_worker_enabled ? 1 : 0
+
+  security_group_id            = aws_security_group.db.id
+  description                  = "Postgres from Lambda webhook worker"
+  referenced_security_group_id = aws_security_group.lambda_worker[0].id
+  from_port                    = 5432
+  to_port                      = 5432
+  ip_protocol                  = "tcp"
+}
+
 resource "aws_db_parameter_group" "app" {
   name        = "${local.name_prefix}-db-pg"
   family      = "postgres${split(".", data.aws_rds_engine_version.postgres.version)[0]}"

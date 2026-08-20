@@ -90,22 +90,28 @@ resource "aws_iam_role" "task" {
 }
 
 data "aws_iam_policy_document" "task_sqs" {
-  # Main queue: receive/ack/backoff.
+  # The app always publishes validated webhooks and entitlement jobs. Consumer
+  # actions are only needed when the same role is also used by the ECS worker.
   statement {
-    actions = [
-      "sqs:ReceiveMessage",
-      "sqs:DeleteMessage",
-      "sqs:GetQueueAttributes",
-      "sqs:GetQueueUrl",
-      "sqs:ChangeMessageVisibility",
-    ]
+    actions = concat(
+      ["sqs:SendMessage"],
+      local.ecs_worker_enabled ? [
+        "sqs:ReceiveMessage",
+        "sqs:DeleteMessage",
+        "sqs:GetQueueAttributes",
+        "sqs:GetQueueUrl",
+        "sqs:ChangeMessageVisibility",
+      ] : [],
+    )
     resources = [aws_sqs_queue.main.arn]
   }
 
-  # DLQ: worker only routes poison messages there explicitly.
-  statement {
-    actions   = ["sqs:SendMessage"]
-    resources = [aws_sqs_queue.dlq.arn]
+  dynamic "statement" {
+    for_each = local.ecs_worker_enabled ? [true] : []
+    content {
+      actions   = ["sqs:SendMessage"]
+      resources = [aws_sqs_queue.dlq.arn]
+    }
   }
 }
 

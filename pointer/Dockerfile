@@ -12,6 +12,8 @@ FROM base AS deps
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Locally packed unpublished dependencies must be present before installation.
+COPY vendor/*.tgz ./vendor/
 # Keep the pnpm store on the same filesystem as node_modules so pnpm can
 # hardlink instead of copying (avoids ~2x disk usage during install).
 RUN pnpm config set store-dir /app/.pnpm-store \
@@ -28,6 +30,23 @@ ENV NEXT_TELEMETRY_DISABLED=1 \
     NODE_ENV=production
 
 RUN pnpm build
+
+# ---------- Lambda worker bundle ----------
+FROM deps AS lambda-builder
+WORKDIR /app
+
+COPY . .
+RUN pnpm build:lambda
+
+# ---------- Lambda worker runtime ----------
+FROM public.ecr.aws/lambda/nodejs:22 AS lambda-worker
+
+ENV NODE_ENV=production \
+    NODE_OPTIONS=--enable-source-maps
+
+COPY --from=lambda-builder /app/dist/lambda/ ${LAMBDA_TASK_ROOT}/
+
+CMD ["index.handler"]
 
 # ---------- Runner ----------
 FROM node:22-alpine AS runner

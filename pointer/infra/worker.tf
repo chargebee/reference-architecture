@@ -13,11 +13,15 @@
 # leader election / coordination is required — just run more tasks.
 
 resource "aws_cloudwatch_log_group" "worker" {
+  count = local.ecs_worker_enabled ? 1 : 0
+
   name              = "/ecs/${local.name_prefix}-worker"
   retention_in_days = 14
 }
 
 resource "aws_ecs_task_definition" "worker" {
+  count = local.ecs_worker_enabled ? 1 : 0
+
   family                   = "${local.name_prefix}-worker"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
@@ -53,7 +57,7 @@ resource "aws_ecs_task_definition" "worker" {
       logConfiguration = {
         logDriver = "awslogs"
         options = {
-          awslogs-group         = aws_cloudwatch_log_group.worker.name
+          awslogs-group         = aws_cloudwatch_log_group.worker[0].name
           awslogs-region        = var.region
           awslogs-stream-prefix = "ecs"
         }
@@ -63,9 +67,11 @@ resource "aws_ecs_task_definition" "worker" {
 }
 
 resource "aws_ecs_service" "worker" {
+  count = local.ecs_worker_enabled ? 1 : 0
+
   name             = "${local.name_prefix}-worker"
   cluster          = aws_ecs_cluster.app.id
-  task_definition  = aws_ecs_task_definition.worker.arn
+  task_definition  = aws_ecs_task_definition.worker[0].arn
   desired_count    = var.worker_desired_count
   launch_type      = "FARGATE"
   platform_version = "LATEST"
@@ -95,19 +101,23 @@ resource "aws_ecs_service" "worker" {
 # => more workers, draining back down to the floor when the backlog clears.
 
 resource "aws_appautoscaling_target" "worker" {
+  count = local.ecs_worker_enabled ? 1 : 0
+
   max_capacity       = var.worker_max_count
   min_capacity       = var.worker_min_count
-  resource_id        = "service/${aws_ecs_cluster.app.name}/${aws_ecs_service.worker.name}"
+  resource_id        = "service/${aws_ecs_cluster.app.name}/${aws_ecs_service.worker[0].name}"
   scalable_dimension = "ecs:service:DesiredCount"
   service_namespace  = "ecs"
 }
 
 resource "aws_appautoscaling_policy" "worker_scale_out" {
+  count = local.ecs_worker_enabled ? 1 : 0
+
   name               = "${local.name_prefix}-worker-scale-out"
   policy_type        = "StepScaling"
-  resource_id        = aws_appautoscaling_target.worker.resource_id
-  scalable_dimension = aws_appautoscaling_target.worker.scalable_dimension
-  service_namespace  = aws_appautoscaling_target.worker.service_namespace
+  resource_id        = aws_appautoscaling_target.worker[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.worker[0].scalable_dimension
+  service_namespace  = aws_appautoscaling_target.worker[0].service_namespace
 
   step_scaling_policy_configuration {
     adjustment_type         = "ChangeInCapacity"
@@ -128,11 +138,13 @@ resource "aws_appautoscaling_policy" "worker_scale_out" {
 }
 
 resource "aws_appautoscaling_policy" "worker_scale_in" {
+  count = local.ecs_worker_enabled ? 1 : 0
+
   name               = "${local.name_prefix}-worker-scale-in"
   policy_type        = "StepScaling"
-  resource_id        = aws_appautoscaling_target.worker.resource_id
-  scalable_dimension = aws_appautoscaling_target.worker.scalable_dimension
-  service_namespace  = aws_appautoscaling_target.worker.service_namespace
+  resource_id        = aws_appautoscaling_target.worker[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.worker[0].scalable_dimension
+  service_namespace  = aws_appautoscaling_target.worker[0].service_namespace
 
   step_scaling_policy_configuration {
     adjustment_type         = "ChangeInCapacity"
@@ -147,6 +159,8 @@ resource "aws_appautoscaling_policy" "worker_scale_in" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "worker_backlog_high" {
+  count = local.ecs_worker_enabled ? 1 : 0
+
   alarm_name          = "${local.name_prefix}-worker-backlog-high"
   alarm_description   = "Chargebee webhook queue backlog is high; add worker tasks."
   namespace           = "AWS/SQS"
@@ -162,10 +176,12 @@ resource "aws_cloudwatch_metric_alarm" "worker_backlog_high" {
     QueueName = aws_sqs_queue.main.name
   }
 
-  alarm_actions = [aws_appautoscaling_policy.worker_scale_out.arn]
+  alarm_actions = [aws_appautoscaling_policy.worker_scale_out[0].arn]
 }
 
 resource "aws_cloudwatch_metric_alarm" "worker_backlog_low" {
+  count = local.ecs_worker_enabled ? 1 : 0
+
   alarm_name          = "${local.name_prefix}-worker-backlog-low"
   alarm_description   = "Chargebee webhook queue backlog is drained; remove worker tasks."
   namespace           = "AWS/SQS"
@@ -181,5 +197,5 @@ resource "aws_cloudwatch_metric_alarm" "worker_backlog_low" {
     QueueName = aws_sqs_queue.main.name
   }
 
-  alarm_actions = [aws_appautoscaling_policy.worker_scale_in.arn]
+  alarm_actions = [aws_appautoscaling_policy.worker_scale_in[0].arn]
 }

@@ -3,3 +3,14 @@
 aws_profile = "my-aws-profile"
 # region    = "us-east-1"
 
+# The default is "ecs". To use the SQS-triggered Lambda worker, build and push
+# :lambda-worker-latest before applying, then select:
+# worker_runtime = "lambda"
+#
+# Optional Lambda tuning:
+# worker_lambda_image_tag      = "lambda-worker-latest"
+# worker_lambda_memory_size    = 1024
+# worker_lambda_timeout_seconds = 60
+# worker_lambda_batch_size     = 10
+# worker_lambda_max_concurrency = 2
+

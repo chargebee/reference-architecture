@@ -27,6 +27,7 @@ resource "aws_secretsmanager_secret_version" "app" {
     chargebee_api_key          = "PLACEHOLDER"
     chargebee_webhook_username = "PLACEHOLDER"
     chargebee_webhook_password = "PLACEHOLDER"
+    admin_user_ids             = ""
   })
 
   lifecycle {
