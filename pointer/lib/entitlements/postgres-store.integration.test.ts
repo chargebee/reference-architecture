@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { createEntitlementsSnapshot } from "@chargebee/entitlements";
+import { createEntitlementsSnapshot } from "@chargebee/entitlements/server";
 
 import { getPool } from "@/lib/db";
 
@@ -20,7 +20,6 @@ postgresTests("Postgres entitlement store", () => {
 
   it("round-trips resolved values and override metadata", async () => {
     const snapshot = createEntitlementsSnapshot(
-      "subscription",
       [
         {
           featureId: "f_sso",
@@ -42,7 +41,6 @@ postgresTests("Postgres entitlement store", () => {
 
     await store.set(key, snapshot);
     await expect(store.get(key)).resolves.toMatchObject({
-      targetMode: "subscription",
       entitlements: {
         f_sso: { value: "true", isOverridden: true },
         f_api_rate_per_minute: {
@@ -55,7 +53,6 @@ postgresTests("Postgres entitlement store", () => {
 
   it("keeps expired snapshots readable so the provider can refresh them", async () => {
     const expired = createEntitlementsSnapshot(
-      "subscription",
       [{ featureId: "f_sso", value: "true", isEnabled: true }],
       -60_000,
     );

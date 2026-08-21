@@ -108,7 +108,6 @@ export async function syncSubscriptionEntitlements(
   try {
     await assertLocalSubscription(chargebeeSubscriptionId);
     const result = await entitlements.refreshSnapshot({
-      mode: "subscription",
       subscriptionId: chargebeeSubscriptionId,
     });
     if (sourceEvent?.id && sourceEvent.event_type) {
@@ -159,7 +158,6 @@ async function deleteSubscriptionEntitlements(
   chargebeeSubscriptionId: string,
 ): Promise<void> {
   await entitlements.deleteSnapshot({
-    mode: "subscription",
     subscriptionId: chargebeeSubscriptionId,
   });
 }

@@ -26,12 +26,6 @@ importers:
       '@chargebee/entitlements':
         specifier: file:vendor/chargebee-entitlements.tgz
         version: file:vendor/chargebee-entitlements.tgz(chargebee@3.30.0)(ioredis@6.0.0(supports-color@7.2.0))(next@16.2.6(@babel/core@7.29.0(supports-color@7.2.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))
-      '@chargebee/openfeature':
-        specifier: file:vendor/chargebee-openfeature.tgz
-        version: file:vendor/chargebee-openfeature.tgz(@openfeature/server-sdk@1.23.0(@openfeature/core@1.12.0))(chargebee@3.30.0)(ioredis@6.0.0(supports-color@7.2.0))(next@16.2.6(@babel/core@7.29.0(supports-color@7.2.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))
-      '@openfeature/server-sdk':
-        specifier: ^1.23.0
-        version: 1.23.0(@openfeature/core@1.12.0)
       '@xyflow/react':
         specifier: ^12.11.1
         version: 12.11.1(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -439,7 +433,7 @@ packages:
       chargebee: ^3.23.1
 
   '@chargebee/entitlements@file:vendor/chargebee-entitlements.tgz':
-    resolution: {integrity: sha512-xGAdRRxGWymAdVYPpnC4f4Ozf8ytesHqFD5e8xbiD3k12Y327Tn+nhJ9858v6ivZs7O4n111ZXT+ZnVuX1Dxqw==, tarball: file:vendor/chargebee-entitlements.tgz}
+    resolution: {integrity: sha512-FsyxzihCLZh/+wG3Nieu8HWFggpq260lr5ahTPPQ5n5PfcclqBQ/1imKZHP9vGh+XAWiY2e/Wn71lHRv2VDubA==, tarball: file:vendor/chargebee-entitlements.tgz}
     version: 0.1.0-alpha.1
     engines: {node: '>=22'}
     peerDependencies:
@@ -447,24 +441,9 @@ packages:
       ioredis: ^6.0.0
       next: ^16.0.0
     peerDependenciesMeta:
-      chargebee:
-        optional: true
       ioredis:
         optional: true
       next:
-        optional: true
-
-  '@chargebee/openfeature@file:vendor/chargebee-openfeature.tgz':
-    resolution: {integrity: sha512-G0QHiaYIKNxtfHxos0udr13xIjxUo4pYRl95mUvPG8CkIEdS2cgwnYuCKd6FLmzOUJD2dJhZGdRzlzvGQuYrEg==, tarball: file:vendor/chargebee-openfeature.tgz}
-    version: 0.1.0-alpha.1
-    engines: {node: '>=22'}
-    peerDependencies:
-      '@openfeature/server-sdk': ^1.23.0
-      '@openfeature/web-sdk': ^1.10.0
-    peerDependenciesMeta:
-      '@openfeature/server-sdk':
-        optional: true
-      '@openfeature/web-sdk':
         optional: true
 
   '@emnapi/core@1.10.0':
@@ -949,15 +928,6 @@ packages:
   '@nolyfill/is-core-module@1.0.39':
     resolution: {integrity: sha512-nn5ozdjYQpUCZlWGuxcJY/KpxkWQs4DcbMCmKojjyrYDEAGy4Ce19NN4v5MduafTwJlbKc99UA8YhSVqq9yPZA==}
     engines: {node: '>=12.4.0'}
-
-  '@openfeature/core@1.12.0':
-    resolution: {integrity: sha512-7PCPzyd1OC19begz30+CRknFB0ChtyaZUhk7YWrk+Bov1fpVw0HYkTXtoxxsvPfDZB9P9WsT7uixN+Z8f9+bcA==}
-
-  '@openfeature/server-sdk@1.23.0':
-    resolution: {integrity: sha512-JWeLvltJIV0AFgOfbw7hK9b9Rw/5wWq+RMhCIU9sJtAqarxr8hSPglG+JAGGhYdElAz3Qwe9W3ApWyPNkQEyqg==}
-    engines: {node: '>=20'}
-    peerDependencies:
-      '@openfeature/core': ^1.12.0
 
   '@opentelemetry/semantic-conventions@1.41.1':
     resolution: {integrity: sha512-/UhIkaZgPutTFmQ7RnIJGgDXZmtEJ7Dvi86xNTFWcnRxVRNk/aotsqDJYeEvDP+FSMB2SdW+pQzNMcWP0rwuNA==}
@@ -1980,6 +1950,7 @@ packages:
   eslint@9.39.4:
     resolution: {integrity: sha512-XoMjdBOwe/esVgEvLmNsD3IRHkm7fbKIUGvrleloJXUZgDHig2IPWNniv+GwjyJXzuNqVjlr5+4yVUZjycJwfQ==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    deprecated: This version is no longer supported. Please see https://eslint.org/version-support for other options.
     hasBin: true
     peerDependencies:
       jiti: '*'
@@ -3794,22 +3765,11 @@ snapshots:
 
   '@chargebee/entitlements@file:vendor/chargebee-entitlements.tgz(chargebee@3.30.0)(ioredis@6.0.0(supports-color@7.2.0))(next@16.2.6(@babel/core@7.29.0(supports-color@7.2.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))':
     dependencies:
-      server-only: 0.0.1
-      zod: 4.4.3
-    optionalDependencies:
       chargebee: 3.30.0
+      server-only: 0.0.1
+    optionalDependencies:
       ioredis: 6.0.0(supports-color@7.2.0)
       next: 16.2.6(@babel/core@7.29.0(supports-color@7.2.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-
-  '@chargebee/openfeature@file:vendor/chargebee-openfeature.tgz(@openfeature/server-sdk@1.23.0(@openfeature/core@1.12.0))(chargebee@3.30.0)(ioredis@6.0.0(supports-color@7.2.0))(next@16.2.6(@babel/core@7.29.0(supports-color@7.2.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))':
-    dependencies:
-      '@chargebee/entitlements': file:vendor/chargebee-entitlements.tgz(chargebee@3.30.0)(ioredis@6.0.0(supports-color@7.2.0))(next@16.2.6(@babel/core@7.29.0(supports-color@7.2.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))
-    optionalDependencies:
-      '@openfeature/server-sdk': 1.23.0(@openfeature/core@1.12.0)
-    transitivePeerDependencies:
-      - chargebee
-      - ioredis
-      - next
 
   '@emnapi/core@1.10.0':
     dependencies:
@@ -4141,12 +4101,6 @@ snapshots:
       fastq: 1.20.1
 
   '@nolyfill/is-core-module@1.0.39': {}
-
-  '@openfeature/core@1.12.0': {}
-
-  '@openfeature/server-sdk@1.23.0(@openfeature/core@1.12.0)':
-    dependencies:
-      '@openfeature/core': 1.12.0
 
   '@opentelemetry/semantic-conventions@1.41.1': {}
 

@@ -1,8 +1,8 @@
+import type { ChargebeeEntitlement } from "@chargebee/entitlements";
 import type {
-  ChargebeeEntitlement,
   ChargebeeEntitlementsSnapshot,
-} from "@chargebee/entitlements";
-import type { EntitlementsStorage } from "@chargebee/entitlements/cache";
+  EntitlementsStorage,
+} from "@chargebee/entitlements/cache";
 import { v7 as uuidv7 } from "uuid";
 
 import { getPool } from "@/lib/db";
@@ -89,7 +89,6 @@ export class PostgresEntitlementsStore implements EntitlementsStorage {
 
     return {
       schemaVersion: 1,
-      targetMode: "subscription",
       generatedAt: snapshot.generatedAt.toISOString(),
       expiresAt: snapshot.expiresAt.toISOString(),
       entitlements: Object.fromEntries(
@@ -102,9 +101,8 @@ export class PostgresEntitlementsStore implements EntitlementsStorage {
     targetKey: string,
     snapshot: ChargebeeEntitlementsSnapshot,
   ): Promise<void> {
-    if (snapshot.targetMode !== "subscription") {
-      throw new Error("Pointer persists subscription entitlement snapshots only");
-    }
+    // Target keys are the only thing that says who a snapshot belongs to now,
+    // so this throws for anything that is not a subscription key.
     const chargebeeSubscriptionId = subscriptionIdFromTargetKey(targetKey);
     const pool = await getPool();
     const client = await pool.connect();

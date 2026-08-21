@@ -19,8 +19,6 @@
     "@aws-sdk/credential-providers": "^3.1073.0",
     "@chargebee/better-auth": "^1.2.0",
     "@chargebee/entitlements": "file:vendor/chargebee-entitlements.tgz",
-    "@chargebee/openfeature": "file:vendor/chargebee-openfeature.tgz",
-    "@openfeature/server-sdk": "^1.23.0",
     "@xyflow/react": "^12.11.1",
     "better-auth": "^1.6.23",
     "chargebee": "^3.30.0",

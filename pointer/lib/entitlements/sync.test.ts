@@ -8,7 +8,6 @@ const mocks = vi.hoisted(() => ({
     source: "api" as const,
     snapshot: {
       schemaVersion: 1 as const,
-      targetMode: "subscription" as const,
       generatedAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 60_000).toISOString(),
       entitlements: {},
@@ -68,7 +67,6 @@ describe("entitlement webhook routing", () => {
       ),
     ).resolves.toBe(true);
     expect(mocks.refreshSnapshot).toHaveBeenCalledWith({
-      mode: "subscription",
       subscriptionId: "sub-direct",
     });
   });
@@ -85,11 +83,9 @@ describe("entitlement webhook routing", () => {
     ).resolves.toBe(true);
     expect(mocks.refreshSnapshot).toHaveBeenCalledTimes(2);
     expect(mocks.refreshSnapshot).toHaveBeenCalledWith({
-      mode: "subscription",
       subscriptionId: "sub-one",
     });
     expect(mocks.refreshSnapshot).toHaveBeenCalledWith({
-      mode: "subscription",
       subscriptionId: "sub-two",
     });
   });
@@ -136,7 +132,6 @@ describe("entitlement webhook routing", () => {
         event(eventType, { subscription: { id: `sub-${eventType}` } }),
       );
       expect(mocks.deleteSnapshot).toHaveBeenCalledWith({
-        mode: "subscription",
         subscriptionId: `sub-${eventType}`,
       });
     }
@@ -174,7 +169,6 @@ describe("queued entitlement sync jobs", () => {
     await runEntitlementSyncJob(job);
 
     expect(mocks.refreshSnapshot).toHaveBeenCalledWith({
-      mode: "subscription",
       subscriptionId: "sub-free",
     });
   });

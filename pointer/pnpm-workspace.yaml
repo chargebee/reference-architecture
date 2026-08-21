@@ -3,8 +3,5 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
 
-# @chargebee/openfeature's packed manifest declares the unpublished
-# @chargebee/entitlements version. Resolve it to the same vendored tarball as
-# the app's direct dependency instead of attempting to fetch it from npm.
 overrides:
   "@chargebee/entitlements": "file:vendor/chargebee-entitlements.tgz"

@@ -1,4 +1,4 @@
-import { FEATURE_IDS, type ResolvedEntitlements } from "./features";
+import { features, type ResolvedEntitlements } from "./features";
 import type { EntitlementSubject } from "./subject";
 import {
   consumeGenerationUsage,
@@ -94,22 +94,22 @@ export async function getUsageSnapshot(
   const counters = await readUsageCounters(subject);
   const thresholds = [
     threshold(
-      FEATURE_IDS.inputTokensDaily,
+      features.inputTokensDaily.featureId,
       counters.inputUsed,
       limits.inputTokensDaily,
     ),
     threshold(
-      FEATURE_IDS.outputTokensDaily,
+      features.outputTokensDaily.featureId,
       counters.outputUsed,
       limits.outputTokensDaily,
     ),
     threshold(
-      FEATURE_IDS.creditsMonthly,
+      features.creditsMonthly.featureId,
       counters.creditsUsed,
       limits.creditsMonthly,
     ),
     threshold(
-      FEATURE_IDS.apiRatePerMinute,
+      features.apiRatePerMinute.featureId,
       counters.rateUsed,
       limits.apiRatePerMinute,
     ),
@@ -126,38 +126,38 @@ export async function getUsageSnapshot(
     },
     features: {
       inputTokensDaily: {
-        featureId: FEATURE_IDS.inputTokensDaily,
+        featureId: features.inputTokensDaily.featureId,
         used: counters.inputUsed,
         limit: jsonLimit(limits.inputTokensDaily),
         remaining: remaining(counters.inputUsed, limits.inputTokensDaily),
       },
       outputTokensDaily: {
-        featureId: FEATURE_IDS.outputTokensDaily,
+        featureId: features.outputTokensDaily.featureId,
         used: counters.outputUsed,
         limit: jsonLimit(limits.outputTokensDaily),
         remaining: remaining(counters.outputUsed, limits.outputTokensDaily),
       },
       creditsMonthly: {
-        featureId: FEATURE_IDS.creditsMonthly,
+        featureId: features.creditsMonthly.featureId,
         used: counters.creditsUsed,
         limit: jsonLimit(limits.creditsMonthly),
         remaining: remaining(counters.creditsUsed, limits.creditsMonthly),
       },
       apiRatePerMinute: {
-        featureId: FEATURE_IDS.apiRatePerMinute,
+        featureId: features.apiRatePerMinute.featureId,
         used: counters.rateUsed,
         limit: jsonLimit(limits.apiRatePerMinute),
         remaining: remaining(counters.rateUsed, limits.apiRatePerMinute),
         windowSeconds: 60,
       },
       models: {
-        featureId: FEATURE_IDS.models,
+        featureId: features.models.featureId,
         tier: limits.models,
         allowedModels: await modelsForTier(limits.models),
       },
-      sso: { featureId: FEATURE_IDS.sso, enabled: limits.sso },
+      sso: { featureId: features.sso.featureId, enabled: limits.sso },
       maxSeats: {
-        featureId: FEATURE_IDS.maxSeats,
+        featureId: features.maxSeats.featureId,
         limit: jsonLimit(limits.maxSeats),
       },
     },
@@ -180,7 +180,7 @@ export async function enforceGeneration(
     throw new EntitlementGateError(
       402,
       "model_not_entitled",
-      FEATURE_IDS.models,
+      features.models.featureId,
       `${request.model} is not available on the ${limits.models} model tier`,
     );
   }
@@ -190,7 +190,7 @@ export async function enforceGeneration(
     throw new EntitlementGateError(
       429,
       "rate_limited",
-      FEATURE_IDS.apiRatePerMinute,
+      features.apiRatePerMinute.featureId,
       "The subscription API rate limit has been reached",
       rate.retryAfterSeconds,
     );
@@ -212,7 +212,7 @@ export async function enforceGeneration(
     throw new EntitlementGateError(
       402,
       "quota_exceeded",
-      FEATURE_IDS.creditsMonthly,
+      features.creditsMonthly.featureId,
       "Daily token quota and monthly credits are exhausted",
     );
   }
