@@ -22,6 +22,8 @@ export type SelfServicePlan = {
   cadence: string;
   blurb: string;
   perks: string[];
+  /** Paid plans need a Chargebee checkout; free is provisioned at sign-up. */
+  paid: boolean;
   featured?: boolean;
 };
 
@@ -74,10 +76,22 @@ export const selfServicePlans: SelfServicePlan[] = selfServicePlanIds.map(
       cadence: "/mo",
       blurb: blurbs[planId],
       perks: perksForPlan(planId),
+      paid: priceUsd > 0,
       featured: planId === "plan-pro",
     };
   },
 );
+
+/**
+ * Resolves a plan chosen before sign-up from an untrusted query parameter, so a
+ * hand-edited `?plan=` can never push an unknown item price into checkout.
+ */
+export function findSelfServicePlan(
+  value: string | string[] | undefined,
+): SelfServicePlan | null {
+  const planId = Array.isArray(value) ? value[0] : value;
+  return selfServicePlans.find((plan) => plan.id === planId) ?? null;
+}
 
 export function planNameFromItemPriceId(
   itemPriceId: string | null | undefined,

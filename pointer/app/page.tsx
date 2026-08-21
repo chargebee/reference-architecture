@@ -5,36 +5,12 @@ import { redirect } from "next/navigation";
 
 import { isAdminRequest } from "@/lib/admin";
 import { auth } from "@/lib/auth";
+import { findSelfServicePlan, selfServicePlans } from "@/lib/self-service-plans";
 import { getActiveUserSubscription } from "@/lib/subscriptions";
 
 import { AccountProvisioning } from "./_components/account-provisioning";
 import { AskPanel } from "./_components/ask-panel";
 import { SignOutButton } from "./_components/sign-out-button";
-
-const plans = [
-  {
-    name: "Starter",
-    price: "$0",
-    cadence: "/mo",
-    blurb: "For trying Pointer on everyday questions.",
-    perks: ["100 answers / month", "Standard models", "Community support"],
-  },
-  {
-    name: "Pro",
-    price: "$24",
-    cadence: "/mo",
-    blurb: "For professionals who live in AI all day.",
-    perks: ["Unlimited answers", "Frontier models", "Priority routing", "Source citations"],
-    featured: true,
-  },
-  {
-    name: "Team",
-    price: "$19",
-    cadence: "/seat",
-    blurb: "For teams that ship together.",
-    perks: ["Everything in Pro", "Shared workspaces", "Admin & usage controls", "SSO"],
-  },
-];
 
 export default async function Home({ searchParams }: PageProps<"/">) {
   const requestHeaders = await headers();
@@ -43,9 +19,21 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
   // Signing up provisions a free subscription in the background, so a brand
   // new account lands here before its local record exists.
+  const { provisioning, plan } = await searchParams;
   const subscription = await getActiveUserSubscription(session.user.id);
+  const requestedPlan = findSelfServicePlan(plan);
+
+  // A paid plan picked on the pricing page can only go to checkout once that
+  // free subscription exists, because upgrading is a switch on an existing
+  // Chargebee subscription.
+  if (
+    requestedPlan?.paid &&
+    subscription?.itemPriceId !== requestedPlan.itemPriceId
+  ) {
+    return <AccountProvisioning checkoutPlan={requestedPlan} />;
+  }
+
   if (!subscription) {
-    const { provisioning } = await searchParams;
     if (provisioning === "1") return <AccountProvisioning />;
     redirect("/choose-plan");
   }
@@ -169,9 +157,9 @@ function MarketingHome() {
             </p>
           </div>
           <div className="grid gap-6 lg:grid-cols-3">
-            {plans.map((plan) => (
+            {selfServicePlans.map((plan) => (
               <div
-                key={plan.name}
+                key={plan.id}
                 className={`flex flex-col rounded-2xl border p-7 ${
                   plan.featured
                     ? "border-[#6E56CF] bg-white shadow-[0_20px_60px_-30px_rgba(110,86,207,0.6)] dark:bg-zinc-950"
@@ -187,7 +175,9 @@ function MarketingHome() {
                   )}
                 </div>
                 <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-4xl font-semibold">{plan.price}</span>
+                  <span className="text-4xl font-semibold">
+                    {plan.priceLabel}
+                  </span>
                   <span className="text-zinc-500">{plan.cadence}</span>
                 </div>
                 <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
@@ -204,7 +194,7 @@ function MarketingHome() {
                   ))}
                 </ul>
                 <Link
-                  href="/sign-up"
+                  href={`/sign-up?plan=${plan.id}`}
                   className={`mt-7 flex h-11 items-center justify-center rounded-full px-5 text-sm font-medium transition-colors ${
                     plan.featured
                       ? "bg-[#6E56CF] text-white hover:bg-[#5a45b3]"

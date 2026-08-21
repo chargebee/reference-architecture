@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
+import { checkoutReturnUrls } from "@/lib/checkout-urls";
 import {
   selfServicePlans,
   type SelfServicePlan,
@@ -11,6 +12,7 @@ import {
 
 type ActiveSubscription = {
   id: string;
+  chargebeeSubscriptionId: string | null;
   itemPriceId?: string | null;
   status: string;
 };
@@ -38,15 +40,19 @@ export function PlanPicker({
 
     const payload = {
       itemPriceId: plan.itemPriceId,
-      successUrl: "/api/entitlements/checkout-complete?callbackURL=%2F",
-      cancelUrl: mode === "switch" ? "/" : "/choose-plan",
+      ...checkoutReturnUrls(mode === "switch" ? "/" : "/choose-plan"),
     };
 
+    // `subscription/update` resolves the record by its Chargebee id, not the
+    // local subscription row id. Without a linked Chargebee subscription there
+    // is nothing to switch, so fall back to opening a new checkout.
+    const chargebeeSubscriptionId = activeSubscription?.chargebeeSubscriptionId;
+
     const { error: subscriptionError } =
-      mode === "switch" && activeSubscription
+      mode === "switch" && chargebeeSubscriptionId
         ? await authClient.subscription.update({
             ...payload,
-            subscriptionId: activeSubscription.id,
+            subscriptionId: chargebeeSubscriptionId,
           })
         : await authClient.subscription.create(payload);
 
