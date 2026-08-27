@@ -4,9 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  '@chargebee/entitlements': file:vendor/chargebee-entitlements.tgz
-
 importers:
 
   .:
@@ -24,8 +21,8 @@ importers:
         specifier: ^1.2.0
         version: 1.2.0(@better-auth/core@1.6.23(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-call@1.3.7(zod@4.4.3))(jose@6.2.3)(kysely@0.29.2)(nanostores@1.3.0))(better-auth@1.6.23(next@16.2.6(@babel/core@7.29.0(supports-color@7.2.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(pg@8.21.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vitest@4.1.10(@types/node@20.19.41)(vite@8.2.1(@types/node@20.19.41)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))))(better-call@1.3.7(zod@4.4.3))(chargebee@3.30.0)
       '@chargebee/entitlements':
-        specifier: file:vendor/chargebee-entitlements.tgz
-        version: file:vendor/chargebee-entitlements.tgz(chargebee@3.30.0)(ioredis@6.0.0(supports-color@7.2.0))(next@16.2.6(@babel/core@7.29.0(supports-color@7.2.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))
+        specifier: 0.1.0-alpha.1
+        version: 0.1.0-alpha.1(chargebee@3.30.0)(ioredis@6.0.0(supports-color@7.2.0))(next@16.2.6(@babel/core@7.29.0(supports-color@7.2.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))
       '@xyflow/react':
         specifier: ^12.11.1
         version: 12.11.1(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -432,9 +429,8 @@ packages:
       better-call: ^1.1.7
       chargebee: ^3.23.1
 
-  '@chargebee/entitlements@file:vendor/chargebee-entitlements.tgz':
-    resolution: {integrity: sha512-FsyxzihCLZh/+wG3Nieu8HWFggpq260lr5ahTPPQ5n5PfcclqBQ/1imKZHP9vGh+XAWiY2e/Wn71lHRv2VDubA==, tarball: file:vendor/chargebee-entitlements.tgz}
-    version: 0.1.0-alpha.1
+  '@chargebee/entitlements@0.1.0-alpha.1':
+    resolution: {integrity: sha512-wIWGeyj2EH5/jNuyDxa8Qn//WeBAXrui/BkgXjsGydYZJRLOnlclcyzTJjfBb5cDUl+NHWNk2cQQfJENYG3K8g==}
     engines: {node: '>=22'}
     peerDependencies:
       chargebee: ^3.30.0
@@ -3763,7 +3759,7 @@ snapshots:
       chargebee: 3.30.0
       zod: 4.4.3
 
-  '@chargebee/entitlements@file:vendor/chargebee-entitlements.tgz(chargebee@3.30.0)(ioredis@6.0.0(supports-color@7.2.0))(next@16.2.6(@babel/core@7.29.0(supports-color@7.2.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))':
+  '@chargebee/entitlements@0.1.0-alpha.1(chargebee@3.30.0)(ioredis@6.0.0(supports-color@7.2.0))(next@16.2.6(@babel/core@7.29.0(supports-color@7.2.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))':
     dependencies:
       chargebee: 3.30.0
       server-only: 0.0.1
