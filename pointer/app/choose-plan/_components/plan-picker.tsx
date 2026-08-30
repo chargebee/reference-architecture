@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
@@ -75,14 +74,6 @@ export function PlanPicker({
               : "Start with Free or upgrade now. Team and Enterprise plans are provisioned separately."}
           </p>
         </div>
-        {mode === "switch" ? (
-          <Link
-            href="/"
-            className="text-sm font-medium text-zinc-600 underline-offset-2 hover:text-zinc-900 hover:underline dark:text-zinc-400 dark:hover:text-zinc-100"
-          >
-            Back to Pointer
-          </Link>
-        ) : null}
       </div>
 
       {error ? (

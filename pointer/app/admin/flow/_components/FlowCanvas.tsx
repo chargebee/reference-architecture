@@ -204,7 +204,7 @@ export function FlowCanvas() {
   }, [state.activeEdges]);
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] w-full flex-col gap-4 px-6 py-6 lg:flex-row">
+    <div className="flex min-h-0 w-full flex-1 flex-col gap-4 px-6 py-6 lg:flex-row">
       <div className="relative h-[60vh] flex-1 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950 lg:h-auto">
         <div className="absolute right-3 top-3 z-10 flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-zinc-700 backdrop-blur dark:bg-zinc-900/80 dark:text-zinc-200">
           <span

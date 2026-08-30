@@ -5,7 +5,6 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getActiveUserSubscription } from "@/lib/subscriptions";
 
-import { SignOutButton } from "../_components/sign-out-button";
 import { SubscriptionCard } from "./_components/subscription-card";
 
 export default async function AdminPage() {
@@ -17,26 +16,13 @@ export default async function AdminPage() {
   const subscription = await getActiveUserSubscription(session.user.id);
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-6 py-16">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Admin
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Operator view. Only admin accounts can open this page.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link
-            href="/"
-            className="text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          >
-            Back to Pointer
-          </Link>
-          <SignOutButton />
-        </div>
-      </div>
+    <main className="mx-auto w-full max-w-2xl px-6 pb-16">
+      <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+        Admin
+      </h1>
+      <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+        Operator view. Only admin accounts can open this page.
+      </p>
 
       <div className="mt-8">
         {subscription ? (
@@ -83,7 +69,7 @@ export default async function AdminPage() {
           </span>
         </Link>
       </section>
-    </div>
+    </main>
   );
 }
 

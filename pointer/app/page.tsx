@@ -3,14 +3,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { isAdminRequest } from "@/lib/admin";
 import { auth } from "@/lib/auth";
 import { findSelfServicePlan, selfServicePlans } from "@/lib/self-service-plans";
 import { getActiveUserSubscription } from "@/lib/subscriptions";
 
 import { AccountProvisioning } from "./_components/account-provisioning";
+import { AppHeader } from "./_components/app-header";
 import { AskPanel } from "./_components/ask-panel";
-import { SignOutButton } from "./_components/sign-out-button";
 
 export default async function Home({ searchParams }: PageProps<"/">) {
   const requestHeaders = await headers();
@@ -38,38 +37,13 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     redirect("/choose-plan");
   }
 
-  return <SignedInHome isAdmin={await isAdminRequest(requestHeaders)} />;
+  return <SignedInHome />;
 }
 
-function SignedInHome({ isAdmin }: { isAdmin: boolean }) {
+function SignedInHome() {
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 font-sans text-zinc-900 dark:bg-black dark:text-zinc-50">
-      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5">
-        <Image
-          src="/pointer-lockup-white.svg"
-          alt="Pointer"
-          width={140}
-          height={40}
-          priority
-        />
-        <nav className="flex items-center gap-3 text-sm font-medium">
-          {isAdmin ? (
-            <Link
-              href="/admin"
-              className="rounded-full px-4 py-2 text-zinc-700 transition-colors hover:bg-black/[.05] dark:text-zinc-300 dark:hover:bg-white/[.06]"
-            >
-              Admin
-            </Link>
-          ) : null}
-          <Link
-            href="/choose-plan"
-            className="rounded-full px-4 py-2 text-zinc-700 transition-colors hover:bg-black/[.05] dark:text-zinc-300 dark:hover:bg-white/[.06]"
-          >
-            Manage plan
-          </Link>
-          <SignOutButton />
-        </nav>
-      </header>
+      <AppHeader />
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10 sm:py-16">
         <AskPanel />

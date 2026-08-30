@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { AppHeader } from "@/app/_components/app-header";
 import { isAdminRequest } from "@/lib/admin";
 import { auth } from "@/lib/auth";
 
@@ -15,5 +16,10 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   if (!session) redirect("/sign-in?from=/admin");
   if (!(await isAdminRequest(requestHeaders))) redirect("/");
 
-  return <>{children}</>;
+  return (
+    <div className="flex flex-1 flex-col bg-zinc-50 font-sans text-zinc-900 dark:bg-black dark:text-zinc-50">
+      <AppHeader active="/admin" />
+      {children}
+    </div>
+  );
 }

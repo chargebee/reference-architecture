@@ -45,10 +45,6 @@ async function* readFrames(body: ReadableStream<Uint8Array>) {
   }
 }
 
-function formatLimit(value: number | "unlimited"): string {
-  return value === "unlimited" ? "Unlimited" : value.toLocaleString();
-}
-
 async function fetchUsage(): Promise<UsageSnapshot> {
   const response = await fetch("/api/usage", { cache: "no-store" });
   const body = await response.json();
@@ -73,43 +69,6 @@ async function waitForEntitlements(active: () => boolean): Promise<boolean> {
     }
   }
   return false;
-}
-
-function Meter({
-  label,
-  used,
-  limit,
-}: {
-  label: string;
-  used: number;
-  limit: number | "unlimited";
-}) {
-  const percent =
-    limit === "unlimited" || limit === 0
-      ? 0
-      : Math.min(100, Math.round((used / limit) * 100));
-  const color =
-    percent >= 100
-      ? "bg-red-500"
-      : percent >= 80
-        ? "bg-amber-500"
-        : "bg-[#6E56CF]";
-  return (
-    <div>
-      <div className="flex justify-between gap-3 text-[11px] text-zinc-500 dark:text-zinc-400">
-        <span>{label}</span>
-        <span className="tabular-nums">
-          {used.toLocaleString()} / {formatLimit(limit)}
-        </span>
-      </div>
-      <div className="mt-1 h-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
-        <div
-          className={`h-full rounded-full transition-all ${color}`}
-          style={{ width: `${percent}%` }}
-        />
-      </div>
-    </div>
-  );
 }
 
 export function AskPanel() {
@@ -320,44 +279,6 @@ export function AskPanel() {
         </article>
       ) : null}
 
-      {usage ? (
-        <div className="rounded-xl border border-zinc-200/70 px-4 py-3 dark:border-zinc-800/70">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">
-              Usage
-            </span>
-            <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-[11px] font-medium text-violet-800 dark:bg-violet-950 dark:text-violet-300">
-              {usage.features.models.tier} models
-            </span>
-          </div>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <Meter
-              label="Input tokens today"
-              used={usage.features.inputTokensDaily.used}
-              limit={usage.features.inputTokensDaily.limit}
-            />
-            <Meter
-              label="Output tokens today"
-              used={usage.features.outputTokensDaily.used}
-              limit={usage.features.outputTokensDaily.limit}
-            />
-            <Meter
-              label="Credits this period"
-              used={usage.features.creditsMonthly.used}
-              limit={usage.features.creditsMonthly.limit}
-            />
-            <Meter
-              label="Requests this minute"
-              used={usage.features.apiRatePerMinute.used}
-              limit={usage.features.apiRatePerMinute.limit}
-            />
-          </div>
-          <p className="mt-3 text-[11px] text-zinc-400">
-            SSO {usage.features.sso.enabled ? "enabled" : "not included"} · Max
-            seats {formatLimit(usage.features.maxSeats.limit)}
-          </p>
-        </div>
-      ) : null}
     </section>
   );
 }

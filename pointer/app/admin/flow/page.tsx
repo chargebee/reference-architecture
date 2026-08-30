@@ -10,7 +10,7 @@ export default async function AdminFlowPage() {
   if (!session) redirect("/sign-in?from=/admin/flow");
 
   return (
-    <div className="flex h-screen w-full flex-col bg-zinc-50 dark:bg-black">
+    <div className="flex min-h-0 w-full flex-1 flex-col">
       <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-6 py-3 dark:border-zinc-800 dark:bg-zinc-950">
         <div>
           <h1 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
