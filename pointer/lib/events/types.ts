@@ -18,7 +18,9 @@ export type AppEventType =
   | "app.generate_requested"
   | "app.generate_denied"
   | "app.generate_completed"
-  | "app.usage_threshold";
+  | "app.usage_threshold"
+  | "app.usage_ingested"
+  | "app.usage_ingest_failed";
 
 export interface AppEvent<TData = Record<string, unknown>> {
   event_id: string;

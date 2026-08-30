@@ -41,6 +41,7 @@ import { Consumer } from "sqs-consumer";
 import {
   createChargebeeWebhookMessageProcessor,
 } from "./chargebee-webhook-processor";
+import { startUsageFlushIfEnabled } from "./usage-flush-loop";
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -88,10 +89,16 @@ consumer.on("timeout_error", (err) => {
   console.error("[chargebee-worker] timeout_error", err);
 });
 
+// Usage batching rides this process rather than its own service: the flush is
+// a periodic drain of a Redis stream, and this is already a long-running task
+// in the VPC with a Redis connection. See workers/usage-flush-loop.ts.
+const usageFlush = startUsageFlushIfEnabled();
+
 const shutdown = (signal: string) => {
   console.log(`[chargebee-worker] ${signal} received, draining...`);
   // abort: false => let in-flight handlers finish before stopping.
   consumer.stop({ abort: false });
+  void usageFlush?.stop();
 };
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));

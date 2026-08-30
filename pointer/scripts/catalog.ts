@@ -295,6 +295,129 @@ export const itemEntitlements: Record<PlanId, ItemEntitlementSpec[]> = {
 };
 
 // ---------------------------------------------------------------------------
+// Metered features (Chargebee `Meter` objects)
+//
+// Distinct from the `features` above: those are `quantity`/`switch`/`custom`
+// entitlement features carrying the numeric limits the app enforces in Redis.
+// A metered feature is a *measurement* — an aggregation query over ingested
+// usage-event properties — and its auto-created feature is always `range` with
+// only `1`/`unlimited` levels, so it cannot carry a limit. The two coexist.
+//
+// Ingestion is schemaless, so one event per generation feeds every meter below;
+// each one selects the columns it needs from the same payload.
+// ---------------------------------------------------------------------------
+
+/** Flat property bag sent as `usage_event.properties`. Keys are meter columns. */
+export type UsageEventProperties = {
+  generation_id: string;
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  credits_consumed: number;
+  usage_source: string;
+  plan_id: string;
+};
+
+/**
+ * Chargebee data type per property. Keyed by `UsageEventProperties` so a new
+ * property cannot be added without declaring how a meter would read it.
+ */
+export const usageEventColumns: Record<
+  keyof UsageEventProperties,
+  "number" | "string"
+> = {
+  generation_id: "string",
+  model: "string",
+  input_tokens: "number",
+  output_tokens: "number",
+  credits_consumed: "number",
+  usage_source: "string",
+  plan_id: "string",
+};
+
+/** Stable app-side handle for a meter. The HTTP API speaks these, not Chargebee ids. */
+export type UsageMetric =
+  | "input_tokens"
+  | "output_tokens"
+  | "credits_consumed"
+  | "generations";
+
+export type MeteredFeatureSpec = {
+  metric: UsageMetric;
+  /**
+   * `POST /metered_features` takes no id — Chargebee derives one from `name`
+   * (`API Calls` -> `API-Calls`). Bootstrap asserts the created id matches this
+   * so runtime lookups stay static instead of listing meters on every read.
+   */
+  expectedId: string;
+  name: string;
+  description: string;
+  feature_unit: string;
+  query: string;
+  column_definitions: Array<{
+    column_name: keyof UsageEventProperties;
+    data_type: "number" | "string";
+  }>;
+};
+
+/** Derives column definitions from the schema so a query can't reference an undeclared property. */
+function columns(
+  ...names: Array<keyof UsageEventProperties>
+): MeteredFeatureSpec["column_definitions"] {
+  return names.map((column_name) => ({
+    column_name,
+    data_type: usageEventColumns[column_name],
+  }));
+}
+
+export const meteredFeatures: MeteredFeatureSpec[] = [
+  {
+    metric: "input_tokens",
+    expectedId: "Input-tokens",
+    name: "Input tokens",
+    description: "Prompt tokens consumed by the subscription",
+    feature_unit: "token",
+    query: "SELECT SUM(input_tokens) FROM events",
+    column_definitions: columns("input_tokens"),
+  },
+  {
+    metric: "output_tokens",
+    expectedId: "Output-tokens",
+    name: "Output tokens",
+    description: "Completion tokens produced for the subscription",
+    feature_unit: "token",
+    query: "SELECT SUM(output_tokens) FROM events",
+    column_definitions: columns("output_tokens"),
+  },
+  {
+    metric: "credits_consumed",
+    expectedId: "Credits-consumed",
+    name: "Credits consumed",
+    description: "Credits drawn down by overage beyond the daily token quotas",
+    feature_unit: "credit",
+    query: "SELECT SUM(credits_consumed) FROM events",
+    column_definitions: columns("credits_consumed"),
+  },
+  {
+    metric: "generations",
+    expectedId: "Generations",
+    name: "Generations",
+    description: "Completed generation requests",
+    feature_unit: "request",
+    query: "SELECT COUNT(generation_id) FROM events",
+    column_definitions: columns("generation_id"),
+  },
+];
+
+export function meteredFeatureFor(metric: UsageMetric): MeteredFeatureSpec {
+  const spec = meteredFeatures.find((entry) => entry.metric === metric);
+  if (!spec) {
+    throw new Error(`No metered feature is declared for metric: ${metric}`);
+  }
+  return spec;
+}
+
+// ---------------------------------------------------------------------------
 // Plan limits — DRY shape consumed by the Better-Auth plugin subscription
 // block (src/lib/auth.ts) so the app can read `subscription.list()[i].limits`
 // without round-tripping to Chargebee for entitlement values.

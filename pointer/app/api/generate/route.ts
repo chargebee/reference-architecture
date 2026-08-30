@@ -1,23 +1,22 @@
 import { type NextRequest } from "next/server";
+import { v7 as uuidv7 } from "uuid";
 
 import { auth } from "@/lib/auth";
 import { resolveEntitlements } from "@/lib/entitlements/features";
 import {
   EntitlementGateError,
-  enforceGeneration,
-  getUsageSnapshot,
+  admitGeneration,
 } from "@/lib/entitlements/gate";
 import { resolveEntitlementSubject } from "@/lib/entitlements/subject";
 import { emit } from "@/lib/events/emit";
 import {
-  simulateGeneration,
+  DEFAULT_OUTPUT_TOKENS,
+  estimateTokens,
   validateGenerateInput,
-} from "@/lib/generate/simulate";
-import { claimUsageThreshold } from "@/lib/usage/counters";
+} from "@/lib/generate";
 
-function upgradeHint(action: "upgrade" | "buy_credits" = "upgrade") {
-  return { action, href: "/choose-plan" as const };
-}
+import { upgradeHint } from "./frames";
+import { generationResponse } from "./stream";
 
 export async function POST(request: NextRequest): Promise<Response> {
   const session = await auth.api.getSession({ headers: request.headers });
@@ -55,66 +54,40 @@ export async function POST(request: NextRequest): Promise<Response> {
     );
   }
 
-  const simulated = simulateGeneration(input);
+  // One id ties every event this request emits, including a pre-flight denial
+  // that never reaches the model.
+  const traceId = uuidv7();
+  const inputTokens = estimateTokens(input.prompt);
   await emit(
     "app.generate_requested",
     {
       subscription_id: subject.chargebeeSubscriptionId,
       model: input.model,
-      input_tokens: simulated.inputTokens,
-      requested_output_tokens: simulated.outputTokens,
+      input_tokens: inputTokens,
+      requested_output_tokens: input.maxOutputTokens ?? DEFAULT_OUTPUT_TOKENS,
     },
-    { source: "app" },
+    { source: "app", trace_id: traceId },
   );
 
+  // Everything that can still become an HTTP status is settled here. Once the
+  // stream opens the response is a 200 and failures ride in-band as frames.
   let entitlementsPending = false;
   try {
     // While the snapshot loads, entitlements resolve to the free-tier floor so
     // a new subscriber can generate without waiting on Chargebee.
     const entitlements = await resolveEntitlements(subject);
     entitlementsPending = entitlements.pending;
-    const consumed = await enforceGeneration(subject, entitlements, {
+    const admitted = await admitGeneration(subject, entitlements, {
       model: input.model,
-      inputTokens: simulated.inputTokens,
-      outputTokens: simulated.outputTokens,
+      inputTokens,
     });
-    const limits = await getUsageSnapshot(subject, entitlements);
-    await emit(
-      "app.generate_completed",
-      {
-        subscription_id: subject.chargebeeSubscriptionId,
-        model: input.model,
-        input_tokens: simulated.inputTokens,
-        output_tokens: simulated.outputTokens,
-        credits_consumed: consumed.creditsConsumed,
-        usage_source: consumed.source,
-      },
-      { source: "app", trace_id: simulated.id },
-    );
-    for (const crossed of limits.thresholds) {
-      if (!(await claimUsageThreshold(subject, crossed.featureId))) continue;
-      await emit(
-        "app.usage_threshold",
-        {
-          subscription_id: subject.chargebeeSubscriptionId,
-          feature_id: crossed.featureId,
-          percent: crossed.percent,
-        },
-        { source: "app", trace_id: simulated.id },
-      );
-    }
 
-    return Response.json({
-      id: simulated.id,
-      model: simulated.model,
-      output: simulated.output,
-      usage: {
-        inputTokens: simulated.inputTokens,
-        outputTokens: simulated.outputTokens,
-        creditsConsumed: consumed.creditsConsumed,
-        source: consumed.source,
-      },
-      limits,
+    return generationResponse({
+      subject,
+      entitlements,
+      input,
+      outputTokenBudget: admitted.outputTokenBudget,
+      traceId,
     });
   } catch (error) {
     if (error instanceof EntitlementGateError) {
@@ -126,7 +99,7 @@ export async function POST(request: NextRequest): Promise<Response> {
           error: error.code,
           feature_id: error.featureId,
         },
-        { source: "app", trace_id: simulated.id },
+        { source: "app", trace_id: traceId },
       );
       const headers = new Headers();
       if (error.retryAfterSeconds) {
@@ -157,7 +130,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         model: input.model,
         error: "enforcement_unavailable",
       },
-      { source: "app", trace_id: simulated.id },
+      { source: "app", trace_id: traceId },
     );
     return Response.json(
       {

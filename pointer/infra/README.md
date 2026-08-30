@@ -262,6 +262,7 @@ secret ARNs; its handler loads and validates both JSON values at cold start.
 | `CHARGEBEE_API_KEY` | `pointer-app-secrets` → `chargebee_api_key` |
 | `CHARGEBEE_WEBHOOK_USERNAME` | `pointer-app-secrets` → `chargebee_webhook_username` |
 | `CHARGEBEE_WEBHOOK_PASSWORD` | `pointer-app-secrets` → `chargebee_webhook_password` |
+| `OPENROUTER_API_KEY` | `pointer-app-secrets` → `openrouter_api_key` |
 | `ADMIN_USER_IDS` | `pointer-app-secrets` → `admin_user_ids` |
 
 `.env.local` is **not** used in production. It's excluded from the Docker build via `.dockerignore`, and Next.js only reads it during `next dev` / `next build` on a developer machine.

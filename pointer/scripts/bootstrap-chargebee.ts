@@ -3,9 +3,16 @@
 // Reads the canonical catalog from ./catalog.ts and ensures every entity
 // exists in the Chargebee site referenced by CHARGEBEE_SITE/CHARGEBEE_API_KEY:
 //
-//   item family -> features -> items (plans + packs) -> item prices -> item entitlements
+//   item family -> features -> items (plans + packs) -> item prices
+//     -> item entitlements -> metered features
 //
 // Re-running converges (already-present resources are updated, never duplicated).
+// Metered features are the exception: Chargebee has no update for them, so that
+// stage creates what is missing and refuses on drift rather than recreating.
+//
+// Metered features also require Advanced Usage Based Billing on the site:
+// Settings > Configure Chargebee > Billing LogIQ > Metered Billing and Advanced
+// Usage Based Billing.
 //
 // Usage:
 //   pnpm bootstrap:chargebee
@@ -19,10 +26,12 @@ import {
   features,
   itemEntitlements,
   itemFamily,
+  meteredFeatures,
   packItemPrices,
   planItemPrices,
   plans,
   type ItemEntitlementSpec,
+  type MeteredFeatureSpec,
   type PlanId,
 } from "./catalog";
 
@@ -215,6 +224,98 @@ async function upsertItemEntitlements() {
 }
 
 // ---------------------------------------------------------------------------
+// Stage 6: Metered Features
+//
+// Unlike every stage above, this one cannot converge. The API offers create /
+// archive / reactivate / delete and no update, so a changed `query` can only be
+// applied by deleting the meter — which discards its aggregation history. This
+// stage therefore creates what is missing and *refuses* on drift.
+//
+// There is also no retrieve-by-id and no way to choose the id: Chargebee
+// derives it from `name` (`API Calls` -> `API-Calls`). Existing meters are
+// found by name, and the resulting id is asserted against the catalog so the
+// app can reference it statically.
+// ---------------------------------------------------------------------------
+
+/** Chargebee echoes queries with its own casing/spacing, so compare loosely. */
+function normalizeQuery(query: string): string {
+  return query.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function assertExpectedId(spec: MeteredFeatureSpec, actualId: string) {
+  if (actualId === spec.expectedId) return;
+
+  throw new Error(
+    `metered feature "${spec.name}" resolved to id "${actualId}", but the ` +
+      `catalog expects "${spec.expectedId}". Update expectedId in ` +
+      `scripts/catalog.ts to "${actualId}".`,
+  );
+}
+
+async function findMeterByName(name: string) {
+  const result = await cb.meter.list({ name: { is: name }, limit: 100 });
+  return (
+    result.list
+      .map((entry) => entry.meter)
+      .find((meter) => meter.name === name && meter.status !== "deleted") ??
+    null
+  );
+}
+
+/** The /meters and /metered_features routes 404 until UBB is switched on. */
+function assertUsageBillingEnabled(err: unknown): never {
+  if (isNotFound(err)) {
+    throw new Error(
+      "Chargebee returned 404 for the metered feature APIs. Enable Settings > " +
+        "Configure Chargebee > Billing LogIQ > Metered Billing and Advanced " +
+        "Usage Based Billing on this site, then re-run.",
+      { cause: err },
+    );
+  }
+  throw err;
+}
+
+async function upsertMeteredFeatures() {
+  for (const spec of meteredFeatures) {
+    const existing = await findMeterByName(spec.name).catch(
+      assertUsageBillingEnabled,
+    );
+
+    if (existing) {
+      assertExpectedId(spec, existing.id);
+
+      if (normalizeQuery(existing.query ?? "") !== normalizeQuery(spec.query)) {
+        throw new Error(
+          `metered feature "${spec.name}" has query "${existing.query}" but ` +
+            `the catalog declares "${spec.query}". Chargebee cannot update a ` +
+            `meter; deleting it would discard its aggregation history. ` +
+            `Resolve manually, then re-run.`,
+        );
+      }
+
+      log("ok", "metered_feature", existing.id);
+      continue;
+    }
+
+    const created = await cb.meteredFeature
+      .create({
+        name: spec.name,
+        description: spec.description,
+        feature_unit: spec.feature_unit,
+        query: spec.query,
+        column_definitions: spec.column_definitions.map((column) => ({
+          column_name: column.column_name,
+          data_type: column.data_type,
+        })),
+      })
+      .catch(assertUsageBillingEnabled);
+
+    assertExpectedId(spec, created.meter.id);
+    log("created", "metered_feature", created.meter.id);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -225,6 +326,7 @@ async function main() {
   await upsertItems();
   await upsertItemPrices();
   await upsertItemEntitlements();
+  await upsertMeteredFeatures();
   console.log("[bootstrap] complete.");
 }
 

@@ -117,3 +117,22 @@ variable "worker_lambda_max_concurrency" {
     error_message = "worker_lambda_max_concurrency must be between 2 and 100."
   }
 }
+
+# Usage tracking.
+
+variable "usage_ingest_enabled" {
+  description = "Buffer generation usage events and flush them to Chargebee. Requires Advanced Usage Based Billing on the site and `pnpm bootstrap:chargebee` to have created the meters. Off by default because neither can be provisioned by Terraform."
+  type        = bool
+  default     = false
+}
+
+variable "usage_flush_interval_ms" {
+  description = "Idle interval between usage flush passes. A pass that leaves a backlog reschedules immediately instead of waiting this long."
+  type        = number
+  default     = 60000
+
+  validation {
+    condition     = var.usage_flush_interval_ms >= 1000 && var.usage_flush_interval_ms <= 600000
+    error_message = "usage_flush_interval_ms must be between 1000 and 600000 so events cannot age out of Chargebee's 12-hour backdating window."
+  }
+}

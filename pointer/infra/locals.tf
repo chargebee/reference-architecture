@@ -24,6 +24,10 @@ locals {
     { name = "ENTITLEMENTS_SNAPSHOT_TTL_SECONDS", value = "86400" },
     { name = "BETTER_AUTH_URL", value = "https://${local.domain}" },
     { name = "BETTER_AUTH_TRUSTED_ORIGINS", value = "https://${local.domain}" },
+    # Usage tracking carries no secret material: the ingest and summary calls
+    # reuse CHARGEBEE_API_KEY above.
+    { name = "CHARGEBEE_USAGE_INGEST_ENABLED", value = tostring(var.usage_ingest_enabled) },
+    { name = "USAGE_FLUSH_INTERVAL_MS", value = tostring(var.usage_flush_interval_ms) },
   ]
 
   container_secrets = [
@@ -50,6 +54,10 @@ locals {
     {
       name      = "CHARGEBEE_WEBHOOK_PASSWORD"
       valueFrom = "${aws_secretsmanager_secret.app.arn}:chargebee_webhook_password::"
+    },
+    {
+      name      = "OPENROUTER_API_KEY"
+      valueFrom = "${aws_secretsmanager_secret.app.arn}:openrouter_api_key::"
     },
     {
       name      = "ADMIN_USER_IDS"

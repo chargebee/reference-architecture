@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type KeyboardEvent } from "react";
 
+import type { GenerateFrame } from "@/app/api/generate/frames";
 import type { UsageSnapshot } from "@/lib/entitlements/gate";
 
 type ApiError = {
@@ -22,16 +23,27 @@ const SUGGESTIONS = [
   "Draft a plan comparison for Starter vs Pro.",
 ];
 
-type GenerateResult = {
-  output: string;
-  usage: {
-    inputTokens: number;
-    outputTokens: number;
-    creditsConsumed: number;
-    source: "plan_quota" | "credits";
-  };
-  limits: UsageSnapshot;
-};
+/** Splits the NDJSON body into frames as they arrive, one JSON object per line. */
+async function* readFrames(body: ReadableStream<Uint8Array>) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let pending = "";
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    pending += decoder.decode(value, { stream: true });
+    const lines = pending.split("\n");
+    // A trailing fragment is the start of the next frame, not a whole one.
+    pending = lines.pop() ?? "";
+
+    for (const line of lines) {
+      if (!line) continue;
+      yield JSON.parse(line) as GenerateFrame;
+    }
+  }
+}
 
 function formatLimit(value: number | "unlimited"): string {
   return value === "unlimited" ? "Unlimited" : value.toLocaleString();
@@ -159,11 +171,19 @@ export function AskPanel() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ prompt: question, model, maxOutputTokens: 256 }),
       });
-      const body = (await response.json()) as GenerateResult | ApiError;
-      if (!response.ok) throw body;
-      const result = body as GenerateResult;
-      setOutput(result.output);
-      applyUsage(result.limits);
+      // Denials raised before the stream opens are still plain JSON.
+      if (!response.ok || !response.body) throw await response.json();
+
+      for await (const frame of readFrames(response.body)) {
+        if (frame.type === "delta") {
+          setOutput((current) => current + frame.text);
+          continue;
+        }
+        // Both terminal frames carry a fresh snapshot, so the meters stay
+        // correct even when generation was cut short.
+        if (frame.limits) applyUsage(frame.limits);
+        if (frame.type === "error") throw frame;
+      }
     } catch (reason) {
       const apiError = reason as ApiError;
       setError({

@@ -1,11 +1,23 @@
-import { features, type ResolvedEntitlements } from "./features";
+import {
+  features,
+  type EntitlementLimits,
+  type ResolvedEntitlements,
+} from "./features";
 import type { EntitlementSubject } from "./subject";
 import {
+  INPUT_CREDIT_MILLI_PER_TOKEN,
+  OUTPUT_CREDIT_MILLI_PER_TOKEN,
   consumeGenerationUsage,
   consumeRateLimit,
   readUsageCounters,
 } from "@/lib/usage/counters";
 import { isModelAllowed, modelsForTier, type ModelTier } from "@/lib/models";
+
+const MILLI_PER_CREDIT = 1_000;
+
+/** Shown whether the wallet ran dry before the call or during it. */
+export const QUOTA_EXHAUSTED =
+  "Daily token quota and monthly credits are exhausted";
 
 export type GateErrorCode =
   | "model_not_entitled"
@@ -166,13 +178,54 @@ export async function getUsageSnapshot(
   };
 }
 
-export async function enforceGeneration(
+/**
+ * Output tokens the subscriber can still pay for: the daily allowance that is
+ * left, plus whatever the remaining monthly credits can buy beyond it. Input
+ * tokens come off the top because they draw on the same credit pool.
+ *
+ *   budget = (dailyOutputLimit - outputUsed)
+ *          + (creditsLeft - inputOverageCost) / OUTPUT_CREDIT_MILLI_PER_TOKEN
+ *
+ * `Infinity` limits propagate through the arithmetic, so an unlimited plan
+ * yields an unlimited budget without a special case.
+ */
+function outputTokenBudget(
+  limits: EntitlementLimits,
+  counters: { inputUsed: number; outputUsed: number; creditsUsed: number },
+  inputTokens: number,
+): number {
+  const outputAllowance = Math.max(
+    0,
+    limits.outputTokensDaily - counters.outputUsed,
+  );
+  const inputAllowance = Math.max(
+    0,
+    limits.inputTokensDaily - counters.inputUsed,
+  );
+  const inputOverage = Math.max(0, inputTokens - inputAllowance);
+
+  const creditsLeftMilli =
+    (limits.creditsMonthly - counters.creditsUsed) * MILLI_PER_CREDIT -
+    inputOverage * INPUT_CREDIT_MILLI_PER_TOKEN;
+
+  return (
+    outputAllowance +
+    Math.floor(Math.max(0, creditsLeftMilli) / OUTPUT_CREDIT_MILLI_PER_TOKEN)
+  );
+}
+
+/**
+ * Everything that can be judged before the model runs. Generation is billed by
+ * the upstream provider, so an unentitled model, an exhausted rate limit, or an
+ * empty wallet has to be rejected here rather than after the invoice is
+ * incurred. The returned budget is what the stream is allowed to spend.
+ */
+export async function admitGeneration(
   subject: EntitlementSubject,
   entitlements: ResolvedEntitlements,
   request: {
     model: string;
     inputTokens: number;
-    outputTokens: number;
   },
 ) {
   const limits = entitlements.limits;
@@ -196,28 +249,59 @@ export async function enforceGeneration(
     );
   }
 
-  const usage = await consumeGenerationUsage(
+  const budget = outputTokenBudget(
+    limits,
+    await readUsageCounters(subject),
+    request.inputTokens,
+  );
+  if (budget < 1) {
+    throw new EntitlementGateError(
+      402,
+      "quota_exceeded",
+      features.creditsMonthly.featureId,
+      QUOTA_EXHAUSTED,
+    );
+  }
+
+  return { outputTokenBudget: budget };
+}
+
+/**
+ * Settles a finished generation: daily token quotas first, and whatever spills
+ * past them against monthly credits. Only the provider knows the real output
+ * token count, so this cannot move ahead of the call.
+ */
+export async function meterGeneration(
+  subject: EntitlementSubject,
+  entitlements: ResolvedEntitlements,
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+  },
+) {
+  const limits = entitlements.limits;
+  const consumed = await consumeGenerationUsage(
     subject,
     {
       inputTokensDaily: limits.inputTokensDaily,
       outputTokensDaily: limits.outputTokensDaily,
       creditsMonthly: limits.creditsMonthly,
     },
-    {
-      inputTokens: request.inputTokens,
-      outputTokens: request.outputTokens,
-    },
+    usage,
   );
-  if (!usage.allowed) {
+  if (!consumed.allowed) {
     throw new EntitlementGateError(
       402,
       "quota_exceeded",
       features.creditsMonthly.featureId,
-      "Daily token quota and monthly credits are exhausted",
+      QUOTA_EXHAUSTED,
     );
   }
   return {
-    ...usage,
-    source: usage.creditsConsumed > 0 ? ("credits" as const) : ("plan_quota" as const),
+    ...consumed,
+    source:
+      consumed.creditsConsumed > 0
+        ? ("credits" as const)
+        : ("plan_quota" as const),
   };
 }
