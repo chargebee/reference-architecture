@@ -140,7 +140,23 @@ terraform apply
 
 ## Database migrations
 
-Better Auth's schema migrations are run by a dedicated, short-lived Fargate task (`pointer-app-migrate`) — **not** by the application container. The task uses a separate image tag (`:migrate-latest`) built from the Dockerfile's `builder` stage, because the slim standalone runtime image at `:latest` doesn't ship the better-auth CLI or full `node_modules`.
+Schema migrations are run by a dedicated, short-lived Fargate task (`pointer-app-migrate`) — **not** by the application container. The task uses a separate image tag (`:migrate-latest`) built from the Dockerfile's `builder` stage, because the slim standalone runtime image at `:latest` doesn't ship the better-auth CLI or full `node_modules`.
+
+The task runs `pnpm db:migrate`, which is two steps in a load-bearing order:
+
+1. `scripts/migrate-usage.ts` applies the usage archive's hand-written DDL — the weekly-partitioned `usage_event` table, its single index, and the pg_cron job that provisions upcoming partitions.
+2. `@better-auth/cli migrate` applies everything declared in `lib/auth.ts` and its plugins.
+
+The order matters because the CLI cannot emit `PARTITION BY RANGE`. On a fresh database it would create an unpartitioned `usage_event` first, and Postgres has no in-place conversion. Run the other way around, the CLI sees the partitioned table as already existing and limits itself to adding columns.
+
+**One-time pg_cron enablement.** `shared_preload_libraries` is a static parameter, so Terraform only stages it — the extension cannot be created until the instance restarts. After the first `terraform apply` that includes it:
+
+```bash
+aws --profile poc rds reboot-db-instance --db-instance-identifier pointer-db
+aws --profile poc rds wait db-instance-available --db-instance-identifier pointer-db
+```
+
+Until then `db:migrate` logs a warning and falls back to creating partitions once per deployment, which is enough to keep writes landing but leaves no scheduler.
 
 **Run them automatically:**
 

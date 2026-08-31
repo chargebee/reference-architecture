@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   batchIngest: vi.fn(),
+  recordUsageBatch: vi.fn(),
   readUsageBatch: vi.fn(),
   reclaimStale: vi.fn(),
   ackUsageEvents: vi.fn(),
@@ -15,6 +16,8 @@ vi.mock("@/plugins/chargebee-plugin", () => ({
 }));
 
 vi.mock("@/lib/events/emit", () => ({ emit: vi.fn() }));
+
+vi.mock("./store", () => ({ recordUsageBatch: mocks.recordUsageBatch }));
 
 vi.mock("./stream", () => ({
   readUsageBatch: mocks.readUsageBatch,
@@ -60,6 +63,7 @@ beforeEach(() => {
   mocks.reclaimStale.mockResolvedValue([]);
   mocks.readUsageBatch.mockResolvedValue([]);
   mocks.usageStreamDepth.mockResolvedValue(0);
+  mocks.recordUsageBatch.mockResolvedValue(undefined);
   mocks.batchIngest.mockResolvedValue({ batch_id: "b1", failed_events: [] });
 });
 
@@ -69,6 +73,44 @@ describe("flushUsage", () => {
 
     expect(mocks.batchIngest).not.toHaveBeenCalled();
     expect(result.ingested).toBe(0);
+  });
+
+  it("archives the batch before it reaches Chargebee", async () => {
+    mocks.readUsageBatch.mockResolvedValue([entry("a"), entry("b")]);
+
+    await flushUsage(CONSUMER);
+
+    expect(mocks.recordUsageBatch).toHaveBeenCalledWith([
+      expect.objectContaining({ deduplicationId: "dedup-a" }),
+      expect.objectContaining({ deduplicationId: "dedup-b" }),
+    ]);
+    expect(mocks.recordUsageBatch.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.batchIngest.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("archives events Chargebee refuses on age", async () => {
+    mocks.readUsageBatch.mockResolvedValue([
+      entry("old", { ageMs: MAX_EVENT_AGE_MS + 1_000 }),
+    ]);
+
+    await flushUsage(CONSUMER);
+
+    expect(mocks.recordUsageBatch).toHaveBeenCalledWith([
+      expect.objectContaining({ deduplicationId: "dedup-old" }),
+    ]);
+    expect(mocks.batchIngest).not.toHaveBeenCalled();
+  });
+
+  it("abandons the pass when the archive write fails", async () => {
+    mocks.readUsageBatch.mockResolvedValue([entry("a")]);
+    mocks.recordUsageBatch.mockRejectedValue(new Error("connection refused"));
+
+    await expect(flushUsage(CONSUMER)).rejects.toThrow("connection refused");
+
+    expect(mocks.batchIngest).not.toHaveBeenCalled();
+    expect(mocks.ackUsageEvents).not.toHaveBeenCalled();
+    expect(mocks.deadLetterUsageEvents).not.toHaveBeenCalled();
   });
 
   it("finishes a dead worker's entries before reading new ones", async () => {

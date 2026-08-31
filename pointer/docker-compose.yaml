@@ -9,7 +9,10 @@ services:
     command: ["redis-server", "--appendonly", "yes"]
 
   postgresql:
-    image: postgres:18-alpine
+    # Built rather than pulled: the stock image has no pg_cron, which schedules
+    # the weekly usage_event partitions. See docker/postgres/Dockerfile.
+    build: ./docker/postgres
+    image: pointer-postgresql:18-cron
     container_name: pointer-postgresql
     ports:
       - "5432:5432"
@@ -17,6 +20,14 @@ services:
       POSTGRES_DB: pointer
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+    # pg_cron loads at server start and keeps its metadata in one database.
+    # Mirrors the RDS parameter group in infra/rds.tf.
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_cron
+      - -c
+      - cron.database_name=pointer
     volumes:
       - postgresql-data:/var/lib/postgresql
 

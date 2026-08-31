@@ -1,38 +1,21 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-const mocks = vi.hoisted(() => ({ retrieve: vi.fn() }));
+const mocks = vi.hoisted(() => ({ readUsageSeries: vi.fn() }));
 
-vi.mock("@/plugins/chargebee-plugin", () => ({
-  chargebeeClient: {
-    usageSummary: { retrieveUsageSummaryForSubscription: mocks.retrieve },
-  },
-}));
+vi.mock("./store", () => ({ readUsageSeries: mocks.readUsageSeries }));
 
 import { fetchUsageSummary, isUsageWindow, snapToWindow } from "./summary";
 
 /** Wednesday, 29 July 2026 at 14:20:33 UTC. */
 const MIDWEEK = new Date("2026-07-29T14:20:33.000Z");
 
-function page(
-  values: number[],
-  nextOffset?: string,
-): { list: unknown[]; next_offset?: string } {
-  return {
-    list: values.map((value, index) => ({
-      usage_summary: {
-        subscription_id: "sub-1",
-        feature_id: "Input-tokens",
-        aggregated_value: String(value),
-        aggregated_from: 1_760_000_000 + index * 3_600,
-        aggregated_to: 1_760_000_000 + (index + 1) * 3_600,
-      },
-    })),
-    ...(nextOffset ? { next_offset: nextOffset } : {}),
-  };
+function bucket(iso: string, value: number) {
+  return { from: new Date(iso), value };
 }
 
 beforeEach(() => {
-  mocks.retrieve.mockReset();
+  mocks.readUsageSeries.mockReset();
+  mocks.readUsageSeries.mockResolvedValue([]);
 });
 
 describe("snapToWindow", () => {
@@ -70,16 +53,14 @@ describe("snapToWindow", () => {
 });
 
 describe("isUsageWindow", () => {
-  it("rejects a window Chargebee would not accept from us", () => {
+  it("rejects a window the aggregate has no bucket for", () => {
     expect(isUsageWindow("day")).toBe(true);
     expect(isUsageWindow("fortnight")).toBe(false);
   });
 });
 
 describe("fetchUsageSummary", () => {
-  it("queries the metered feature id with a calendar-snapped start", async () => {
-    mocks.retrieve.mockResolvedValue(page([1]));
-
+  it("queries from a calendar-snapped start", async () => {
     await fetchUsageSummary({
       subscriptionId: "sub-1",
       metric: "input_tokens",
@@ -88,19 +69,21 @@ describe("fetchUsageSummary", () => {
       to: new Date("2026-07-30T14:20:33.000Z"),
     });
 
-    expect(mocks.retrieve).toHaveBeenCalledWith(
-      "sub-1",
+    expect(mocks.readUsageSeries).toHaveBeenCalledWith(
       expect.objectContaining({
-        feature_id: "Input-tokens",
-        window_size: "day",
+        subscriptionId: "sub-1",
+        metric: "input_tokens",
+        window: "day",
         // 2026-07-29T00:00:00Z, not the 14:20 the caller passed.
-        timeframe_start: Date.UTC(2026, 6, 29) / 1_000,
+        from: new Date("2026-07-29T00:00:00.000Z"),
       }),
     );
   });
 
-  it("coerces the string aggregate the SDK declares", async () => {
-    mocks.retrieve.mockResolvedValue(page([42]));
+  it("carries the metered feature's identity and unit", async () => {
+    mocks.readUsageSeries.mockResolvedValue([
+      bucket("2026-07-29T00:00:00.000Z", 42),
+    ]);
 
     const series = await fetchUsageSummary({
       subscriptionId: "sub-1",
@@ -111,27 +94,70 @@ describe("fetchUsageSummary", () => {
     });
 
     expect(series.points[0]?.value).toBe(42);
+    expect(series.featureId).toBe("Output-tokens");
     expect(series.unit).toBe("token");
   });
 
-  it("follows next_offset until the last page", async () => {
-    mocks.retrieve
-      .mockResolvedValueOnce(page([1, 2], "cursor-2"))
-      .mockResolvedValueOnce(page([3]));
+  it("emits a zero bucket where nothing was recorded", async () => {
+    mocks.readUsageSeries.mockResolvedValue([
+      bucket("2026-07-29T00:00:00.000Z", 5),
+      bucket("2026-07-31T00:00:00.000Z", 7),
+    ]);
 
     const series = await fetchUsageSummary({
       subscriptionId: "sub-1",
       metric: "generations",
-      window: "hour",
+      window: "day",
       from: MIDWEEK,
-      to: new Date("2026-07-30T00:00:00.000Z"),
+      to: new Date("2026-08-01T00:00:00.000Z"),
     });
 
-    expect(mocks.retrieve).toHaveBeenCalledTimes(2);
-    expect(mocks.retrieve.mock.calls[1]?.[1]).toMatchObject({
-      offset: "cursor-2",
-    });
-    expect(series.points.map((p) => p.value)).toEqual([1, 2, 3]);
+    expect(series.points).toEqual([
+      {
+        from: "2026-07-29T00:00:00.000Z",
+        to: "2026-07-30T00:00:00.000Z",
+        value: 5,
+      },
+      {
+        from: "2026-07-30T00:00:00.000Z",
+        to: "2026-07-31T00:00:00.000Z",
+        value: 0,
+      },
+      {
+        from: "2026-07-31T00:00:00.000Z",
+        to: "2026-08-01T00:00:00.000Z",
+        value: 7,
+      },
+    ]);
     expect(series.truncated).toBe(false);
+  });
+
+  it("steps month buckets across their uneven lengths", async () => {
+    const series = await fetchUsageSummary({
+      subscriptionId: "sub-1",
+      metric: "input_tokens",
+      window: "month",
+      from: new Date("2026-01-15T00:00:00.000Z"),
+      to: new Date("2026-04-01T00:00:00.000Z"),
+    });
+
+    expect(series.points.map((point) => point.from)).toEqual([
+      "2026-01-01T00:00:00.000Z",
+      "2026-02-01T00:00:00.000Z",
+      "2026-03-01T00:00:00.000Z",
+    ]);
+  });
+
+  it("trims a range with more buckets than it can chart", async () => {
+    const series = await fetchUsageSummary({
+      subscriptionId: "sub-1",
+      metric: "input_tokens",
+      window: "hour",
+      from: new Date("2026-01-01T00:00:00.000Z"),
+      to: new Date("2026-12-31T00:00:00.000Z"),
+    });
+
+    expect(series.points).toHaveLength(1_000);
+    expect(series.truncated).toBe(true);
   });
 });

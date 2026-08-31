@@ -10,8 +10,8 @@ This document outlines the high level architecture of the app, including it's te
 | Web + API | **Next.js 16** (App Router, standalone build), **React 19** | Renders the UI and hosts all HTTP endpoints |
 | Auth | **Better Auth** | Email/password, 2FA, bearer tokens, organizations, admin |
 | Billing | **Chargebee** + [@chargebee/better-auth](https://npmx.dev/@chargebee/better-auth) plugin | Customer/subscription lifecycle and webhook sync |
-| Primary DB | **PostgreSQL 18** (via `pg` + Kysely) | Users, sessions, orgs, subscription mirror |
-| Cache + streams | **Redis 8** (`ioredis`) | Idempotency helpers and the live event stream |
+| Primary DB | **PostgreSQL 18** (via `pg` + Kysely) | Users, sessions, orgs, subscription mirror, usage archive |
+| Cache + streams | **Redis 8** (`ioredis`) | Idempotency helpers, usage counters, the usage-event buffer, and the live event stream |
 | Async transport | **AWS SQS** (+ DLQ), `sqs-consumer` | Buffers Chargebee webhooks for the worker |
 | Background jobs | Standalone Node process (`tsx`) | Consumes SQS and applies DB sync |
 
@@ -30,7 +30,7 @@ flowchart LR
             WHIn["Webhook endpoint<br/>validate + enqueue"]
             SSE["/api/events/stream<br/>(SSE)"]
         end
-        Worker["pointer-worker<br/>SQS consumer +<br/>correctness pipeline"]
+        Worker["pointer-worker<br/>SQS consumer +<br/>correctness pipeline<br/>+ usage flush loop"]
     end
 
     Queue[["SQS queue"]]
@@ -42,6 +42,8 @@ flowchart LR
     Web -->|"create customer / subscription"| CB
     Web --> PG
     Web -->|"publish events"| Redis
+    Web -->|"buffer usage events"| Redis
+    Web -->|"read usage history"| PG
     SSE -->|"subscribe"| Redis
     User -->|"live flow view"| SSE
 
@@ -51,6 +53,9 @@ flowchart LR
     Worker -->|"plugin DB-sync hooks"| PG
     Worker -->|"poison / exhausted"| DLQ
     Worker -->|"publish events"| Redis
+    Redis -->|"drain buffer"| Worker
+    Worker -->|"archive usage events"| PG
+    Worker -->|"batch ingest usage"| CB
 ```
 
 **Reading the diagram**
@@ -63,9 +68,15 @@ flowchart LR
   and enqueues them to SQS, then returns `2xx` immediately. The worker picks them up and
   applies changes to Postgres. Once `subscription_created` has established the local
   subscription row, the worker queues a second job to fetch and persist its entitlements.
-- **Observation tap:** every meaningful step emits an event onto a Redis stream. The `/flow`
-  page subscribes over Server-Sent Events to animate the system live — it is purely for
-  demonstration and never on the critical path.
+- **Usage path:** each settled generation is appended to a Redis stream. The worker drains it
+  into two sinks in one pass: a weekly-partitioned Postgres table, then Chargebee's batch
+  ingest API. Quotas are still enforced locally from Redis counters; Postgres holds the
+  history those counters discard at each period reset, and serves the usage page. Chargebee
+  remains the billing system of record, but its API quota is a billing budget and is not
+  spent on a page a subscriber refreshes several times a day.
+- **Observation tap:** every meaningful step emits an event onto a Redis stream. The
+  `/admin/flow` page subscribes over Server-Sent Events to animate the system live — it is
+  purely for demonstration and never on the critical path.
 
 ---
 
@@ -79,18 +90,20 @@ The single web/API application. It is responsible for:
   bill against the user; Team accounts bill against the organization.
 - **Chargebee provisioning** — on user creation a Chargebee customer is created (or reused),
   its ID is stored on the `user` row, and an idempotent free subscription is created. The
-  dashboard waits for the subscription webhook before opening, then uses free-tier defaults
+  home page waits for the subscription webhook before opening, then uses free-tier defaults
   while the queued entitlement snapshot finishes loading.
 - **Webhook ingress** — the Chargebee webhook endpoint validates HTTP Basic Auth, parses the
   payload, and enqueues it to SQS. It intentionally does **no** database work, so a webhook
   storm can never degrade the web tier.
 - **Live event stream** — publishes domain events to a Redis stream and exposes them over SSE
-  for the `/flow` visualization.
+  for the `/admin/flow` visualization.
 
-### 3.2 `pointer-worker` (SQS consumer)
+### 3.2 `pointer-worker` (selectable SQS consumer)
 
-A long-running process that owns all webhook-driven database sync. For each message it runs a
-correctness pipeline that the plugin alone can't provide:
+The worker owns all webhook-driven database sync and can run as either an ECS service (the
+default) or an SQS-triggered Lambda function, selected by Terraform's `worker_runtime`
+variable. The runtimes are mutually exclusive and consume the same durable queue. Both call
+the same per-message correctness pipeline that the plugin alone can't provide:
 
 ```
 parse → stale/duplicate guard → dependency pre-check → process
@@ -102,12 +115,29 @@ parse → stale/duplicate guard → dependency pre-check → process
 - **Error handling** — transient/dependency-not-ready errors get an increasing backoff (via
   `ChangeMessageVisibility`) and are left on the queue; after 5 attempts SQS auto-routes them
   to the DLQ. Malformed "poison" messages are sent straight to the DLQ.
-- **Scaling** — more load simply means more worker tasks; SQS fans messages out and the
-  visibility timeout prevents double-processing. No leader election.
+- **Scaling** — ECS scales tasks from queue-depth alarms. Lambda uses a bounded SQS event
+  source concurrency so its warm connection pools cannot overwhelm PostgreSQL or Redis.
+  SQS visibility prevents simultaneous processing; no leader election is required.
+- **Lambda batches** — partial batch responses retry only failed records. A cold Lambda loads
+  the existing application and database secrets from Secrets Manager before constructing the
+  Better Auth processor; warm environments reuse the processor and connection pools.
+- **Networking** — Lambda runs in private subnets for RDS/Redis and reaches Chargebee and AWS
+  APIs through a NAT gateway. The POC uses one NAT; production should use one per AZ.
 - **Entitlement jobs** — after the subscription-created webhook writes the subscription and
   item rows, the same queue receives a job for its entitlement snapshot. Jobs skip the webhook
   pipeline, since there is no additional Chargebee event to order or verify, but reuse the
   backoff and DLQ.
+- **Usage flush** — a second loop drains the Redis usage buffer into Postgres and then
+  Chargebee, up to 500 events per pass (Chargebee's batch ceiling). Both sinks are fed from
+  one pass rather than a second consumer group, because settling an entry deletes it from the
+  stream: whichever group acknowledged first would take it away from the other. A failed
+  Postgres write abandons the pass without acknowledging anything, since history is the read
+  path and a silent gap would be visible to the subscriber. It rides this process rather than
+  a service of its own: the work is a periodic drain and this is already a long-running task in the VPC
+  with a Redis connection. Redis consumer groups spread entries across however many tasks
+  autoscaling creates, so no leader election is needed — the same property SQS provides for
+  webhooks. The loop requires the ECS runtime; `lib/usage/flush.ts` is runtime-agnostic so a
+  scheduled Lambda could drive it instead.
 
 See [`docs/plans/5-webhook-correctness.md`](docs/plans/5-webhook-correctness.md) for the full rationale.
 
@@ -117,9 +147,22 @@ See [`docs/plans/5-webhook-correctness.md`](docs/plans/5-webhook-correctness.md)
   organizations, members) plus the Chargebee plugin's tables and a small
   `chargebee_resource_version` table used for out-of-order protection. Schema changes are
   applied by Better Auth's migration CLI, run as a dedicated one-off task.
-- **Redis** — hosts the Redis-Streams event bus for the live flow view and short-lived
-  idempotency/cache helpers. It is a best-effort observation tap: if it is down, publishing
-  fails silently and the caller is unaffected.
+  It also holds `usage_event`, the durable usage archive. That table is range-partitioned by
+  ISO week so a period's worth of history is a handful of contiguous partitions and ageing
+  data can be dropped by detaching one; `pg_cron` provisions the coming fortnight's
+  partitions nightly, with a `DEFAULT` partition catching anything it misses. A single
+  unique index on `("subscriptionId", "usageTimestamp", "deduplicationId")` does double duty
+  — it is the history query's range scan and the conflict target that makes the flush loop's
+  at-least-once replay a no-op — so the write path pays for exactly one index. The CLI cannot
+  express partitioning, so `lib/usage/partitions.ts` owns that DDL while
+  `plugins/usage-plugin.ts` keeps the columns under CLI management.
+- **Redis** — hosts the Redis-Streams event bus for the live flow view, the quota and rate
+  counters, and the usage-event buffer awaiting its next Chargebee batch. The event bus is a
+  best-effort observation tap: if it is down, publishing fails silently and the caller is
+  unaffected. The usage buffer is held to a higher bar — it is read through a consumer group
+  so an unacknowledged batch survives a worker crash — but it is not as durable as SQS. A node
+  loss drops at most one flush interval of events. Production should enable AOF or add a
+  replica; the POC runs a single `cache.t4g.micro`.
 
 ### 3.4 Chargebee
 
@@ -183,14 +226,20 @@ publicly reachable, and IAM scoped to specific secret and queue ARNs.
 
 `docker-compose.yaml` brings up the full dependency set offline:
 
-- **Postgres 18** on `:5432`
+- **Postgres 18** on `:5432`, built from [`docker/postgres`](docker/postgres) so it carries
+  `pg_cron` (the stock image does not) and loads it with the same settings as the RDS
+  parameter group
 - **Redis 8** on `:6379`
 - **LocalStack** on `:4566` providing SQS, with the webhook queue + DLQ created on startup
   (mirroring `infra/sqs.tf`)
 
-The app runs with `next dev`, and the worker with `pnpm worker:chargebee`. This mirrors the
-production topology closely enough that the same code paths — enqueue, consume, sync — are
-exercised end to end without any AWS account.
+Apply the schema with `pnpm db:migrate:local`, run the app with `next dev`, and the worker
+with `pnpm worker:chargebee`. This mirrors the production topology closely enough that the
+same code paths — enqueue, consume, sync — are exercised end to end without any AWS account.
+
+The Postgres image moved from the alpine variant to Debian for `pg_cron`, which changes the
+collation provider. An existing `postgresql-data` volume should be recreated
+(`docker compose down -v postgresql`) rather than reused across that switch.
 
 ---
 

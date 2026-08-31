@@ -1,30 +1,35 @@
 /**
- * Chargebee usage-summary driver: buffered usage read back as a time series.
+ * Buffered usage read back as a time series, from the local archive.
  *
- * This is a reporting surface, never an enforcement one. The endpoint is
- * documented as eventually consistent, and events reach it a batch behind the
- * flush interval, so quota decisions stay with the Redis counters in
- * `counters.ts`. What this gives the subscriber is history, which the counters
- * cannot: they only ever hold the current period.
+ * This is a reporting surface, never an enforcement one. Events land here a
+ * batch behind the flush interval, so quota decisions stay with the Redis
+ * counters in `counters.ts`. What this gives the subscriber is history, which
+ * the counters cannot: they only ever hold the current period.
+ *
+ * # Why not Chargebee's usage summary
+ *
+ * Chargebee is still the billing system of record and still receives every
+ * event, but its API quota is a billing budget. A subscriber refreshing this
+ * page several times a day would spend it on reporting. `store.ts` aggregates
+ * the same events out of Postgres instead, at no external cost.
  *
  * # Window alignment
  *
- * Chargebee buckets from `timeframe_start` forward, not on calendar
- * boundaries. Asking for `day` at 14:20 yields rolling 14:20-to-14:20 windows,
- * which is not what a chart labelled "daily" means, so the start is snapped to
- * a UTC boundary before the call.
+ * A chart labelled "daily" has to mean calendar days, so the requested start is
+ * snapped to a UTC boundary and every bucket in the range is emitted — an empty
+ * one as zero. `GROUP BY` only returns occupied buckets, and the chart spaces
+ * points evenly, so a sparse series would silently misdate every bar.
  */
 
 import { meteredFeatureFor, type UsageMetric } from "@/scripts/catalog";
-import { chargebeeClient } from "@/plugins/chargebee-plugin";
+
+import { readUsageSeries, type UsageBucket } from "./store";
 
 export type UsageWindow = "hour" | "day" | "week" | "month";
 
 const WINDOWS: UsageWindow[] = ["hour", "day", "week", "month"];
 
-/** Chargebee's per-page ceiling for usage summary entries. */
-const PAGE_SIZE = 100;
-/** Bounds paging on an over-broad range, e.g. hourly windows across a year. */
+/** Bounds the response on an over-broad range, e.g. hourly windows across a year. */
 const MAX_WINDOWS = 1_000;
 
 export function isUsageWindow(value: string): value is UsageWindow {
@@ -33,7 +38,7 @@ export function isUsageWindow(value: string): value is UsageWindow {
 
 /**
  * Floors a timestamp to the start of its UTC calendar window. Weeks start
- * Monday, matching ISO-8601.
+ * Monday, matching ISO-8601 and the weekly partition boundaries.
  */
 export function snapToWindow(date: Date, window: UsageWindow): Date {
   const year = date.getUTCFullYear();
@@ -54,8 +59,22 @@ export function snapToWindow(date: Date, window: UsageWindow): Date {
   return new Date(Date.UTC(year, month, 1));
 }
 
-function toEpochSeconds(date: Date): number {
-  return Math.floor(date.getTime() / 1_000);
+/** Start of the window after `date`. `date` is assumed already snapped. */
+function nextWindow(date: Date, window: UsageWindow): Date {
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  const day = date.getUTCDate();
+
+  if (window === "hour") {
+    return new Date(Date.UTC(year, month, day, date.getUTCHours() + 1));
+  }
+  if (window === "day") {
+    return new Date(Date.UTC(year, month, day + 1));
+  }
+  if (window === "week") {
+    return new Date(Date.UTC(year, month, day + 7));
+  }
+  return new Date(Date.UTC(year, month + 1, 1));
 }
 
 export type UsageSummaryPoint = {
@@ -86,44 +105,57 @@ export type UsageSummaryQuery = {
   to: Date;
 };
 
+/** Walks the range one window at a time, reading zero where nothing was recorded. */
+function fillBuckets(
+  buckets: UsageBucket[],
+  window: UsageWindow,
+  from: Date,
+  to: Date,
+): { points: UsageSummaryPoint[]; truncated: boolean } {
+  const recorded = new Map(
+    buckets.map((bucket) => [bucket.from.getTime(), bucket.value]),
+  );
+
+  const points: UsageSummaryPoint[] = [];
+  let start = from;
+
+  while (start < to) {
+    if (points.length >= MAX_WINDOWS) return { points, truncated: true };
+
+    const end = nextWindow(start, window);
+    points.push({
+      from: start.toISOString(),
+      to: end.toISOString(),
+      value: recorded.get(start.getTime()) ?? 0,
+    });
+    start = end;
+  }
+
+  return { points, truncated: false };
+}
+
 export async function fetchUsageSummary(
   query: UsageSummaryQuery,
 ): Promise<UsageSummarySeries> {
   const feature = meteredFeatureFor(query.metric);
   const from = snapToWindow(query.from, query.window);
 
-  const points: UsageSummaryPoint[] = [];
-  let offset: string | undefined;
-  let truncated = false;
+  const buckets = await readUsageSeries({
+    subscriptionId: query.subscriptionId,
+    metric: query.metric,
+    window: query.window,
+    from,
+    to: query.to,
+    // One past the cap: enough to know the range overflowed without paging it.
+    limit: MAX_WINDOWS + 1,
+  });
 
-  do {
-    const page = await chargebeeClient.usageSummary.retrieveUsageSummaryForSubscription(
-      query.subscriptionId,
-      {
-        feature_id: feature.expectedId,
-        window_size: query.window,
-        timeframe_start: toEpochSeconds(from),
-        timeframe_end: toEpochSeconds(query.to),
-        limit: PAGE_SIZE,
-        ...(offset ? { offset } : {}),
-      },
-    );
-
-    for (const entry of page.list) {
-      points.push({
-        from: new Date(entry.usage_summary.aggregated_from * 1_000).toISOString(),
-        to: new Date(entry.usage_summary.aggregated_to * 1_000).toISOString(),
-        // Typed as a string by the SDK, returned as a number by the API.
-        value: Number(entry.usage_summary.aggregated_value ?? 0),
-      });
-    }
-
-    offset = page.next_offset;
-    if (offset && points.length >= MAX_WINDOWS) {
-      truncated = true;
-      break;
-    }
-  } while (offset);
+  const { points, truncated } = fillBuckets(
+    buckets,
+    query.window,
+    from,
+    query.to,
+  );
 
   return {
     metric: query.metric,

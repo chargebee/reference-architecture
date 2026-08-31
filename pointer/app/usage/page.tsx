@@ -25,7 +25,7 @@ export const metadata: Metadata = { title: "Usage · Pointer" };
 const DEFAULT_RANGE: UsageRangeKey = "24h";
 
 /**
- * A Chargebee outage or an unconfigured site must not take the Redis-backed
+ * A database problem or an unconfigured site must not take the Redis-backed
  * quotas down with it, so the history section reports its own state.
  */
 type History =
@@ -33,7 +33,7 @@ type History =
   | { status: "disabled" }
   | { status: "unavailable" };
 
-/** One Chargebee call per metered feature — its summary aggregates one at a time. */
+/** One aggregate per metered feature — each reduces to a different column. */
 async function loadHistory(
   subscriptionId: string,
   range: UsageRange,
@@ -114,11 +114,11 @@ export default async function UsagePage({ searchParams }: PageProps<"/usage">) {
       </div>
 
       <p className="mt-4 text-[11px] leading-5 text-zinc-400">
-        Ranges are aggregated by Chargebee from ingested usage events and are
-        eventually consistent. Allowances scale the enforced limit to the range,
-        so only 24 hours (daily token quotas) and the billing period (monthly
-        credits) match a real reset boundary. Enforcement always reads the
-        counters under &ldquo;Right now&rdquo;.
+        Ranges are aggregated from buffered usage events, so they trail the
+        current moment by up to one flush interval. Allowances scale the
+        enforced limit to the range, so only 24 hours (daily token quotas) and
+        the billing period (monthly credits) match a real reset boundary.
+        Enforcement always reads the counters under &ldquo;Right now&rdquo;.
       </p>
     </main>
   );

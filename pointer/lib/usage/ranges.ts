@@ -1,10 +1,10 @@
 /**
  * Reporting ranges for the usage page.
  *
- * Chargebee's usage summary takes a window size and a timeframe; a subscriber
- * thinks in "the last 24 hours" or "this billing period". This translates one
- * into the other, and scales the enforced limits to the same span so a range
- * total has something to be read against.
+ * The summary query takes a window size and a timeframe; a subscriber thinks in
+ * "the last 24 hours" or "this billing period". This translates one into the
+ * other, and scales the enforced limits to the same span so a range total has
+ * something to be read against.
  *
  * The scaling is a pace line, not a ceiling. Only two combinations land on a
  * real enforcement window: `24h` against the daily token quotas, and `period`

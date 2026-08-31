@@ -6,6 +6,10 @@ locals {
   az_count       = 2
   azs            = slice(data.aws_availability_zones.available.names, 0, local.az_count)
 
+  # Named here rather than read off the instance: the parameter group needs it
+  # for cron.database_name, and depending on the instance would be a cycle.
+  db_name = "pointer"
+
   ecs_worker_enabled    = var.worker_runtime == "ecs"
   lambda_worker_enabled = var.worker_runtime == "lambda"
   worker_queue_visibility_timeout_seconds = local.lambda_worker_enabled ? (

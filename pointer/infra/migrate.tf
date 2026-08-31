@@ -1,4 +1,4 @@
-# Standalone migration task (Better Auth schema migrations).
+# Standalone migration task (database schema migrations).
 #
 # Run before each deployment with:
 #   ./scripts/migrate.sh
@@ -6,7 +6,12 @@
 #
 # Uses a separate image tag (:migrate-latest) built from the Dockerfile's
 # `builder` stage, which contains the full source + node_modules required by
-# `npx @better-auth/cli migrate` (the slim runtime image at :latest does not).
+# `pnpm db:migrate` (the slim runtime image at :latest does not).
+#
+# `db:migrate` applies the hand-written usage-archive DDL before invoking the
+# Better Auth CLI. The order is load-bearing: `usage_event` is partitioned by
+# week, the CLI cannot express that, and there is no in-place conversion from an
+# unpartitioned table.
 
 resource "aws_cloudwatch_log_group" "migrate" {
   name              = "/ecs/${local.name_prefix}-app-migrate"
@@ -33,7 +38,7 @@ resource "aws_ecs_task_definition" "migrate" {
       image     = "${aws_ecr_repository.app.repository_url}:migrate-latest"
       essential = true
 
-      command = ["npx", "--yes", "@better-auth/cli@latest", "migrate", "-y"]
+      command = ["pnpm", "db:migrate"]
 
       environment = local.container_env
       secrets     = local.container_secrets

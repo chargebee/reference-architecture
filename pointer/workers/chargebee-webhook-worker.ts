@@ -97,7 +97,7 @@ const usageFlush = startUsageFlushIfEnabled();
 const shutdown = (signal: string) => {
   console.log(`[chargebee-worker] ${signal} received, draining...`);
   // abort: false => let in-flight handlers finish before stopping.
-  consumer.stop({ abort: false });
+  consumer.stop({ abort: true });
   void usageFlush?.stop();
 };
 process.on("SIGINT", () => shutdown("SIGINT"));

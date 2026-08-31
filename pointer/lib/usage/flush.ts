@@ -1,9 +1,13 @@
 /**
- * The batch pump: drain the usage buffer into Chargebee.
+ * The batch pump: drain the usage buffer into Postgres and Chargebee.
  *
- *   reclaim stale ─▶ read new ─▶ drop expired ─▶ ingest ─▶ ack
- *                                     │            │
- *                                     └─ dead ◀────┘ (exhausted)
+ *   reclaim stale ─▶ read new ─▶ archive ─▶ drop expired ─▶ ingest ─▶ ack
+ *                                              │             │
+ *                                              └─ dead ◀─────┘ (exhausted)
+ *
+ * Both sinks are fed from one pass rather than a second consumer group,
+ * because `ackUsageEvents` does `XDEL` as well as `XACK`: whichever group
+ * acknowledged an entry first would delete it out from under the other.
  *
  * Runtime-agnostic on purpose. The ECS worker calls `flushUsage` on an
  * interval; an EventBridge-scheduled Lambda could call the same function
@@ -31,6 +35,7 @@ import {
   usageStreamDepth,
   type UsageStreamEntry,
 } from "./stream";
+import { recordUsageBatch } from "./store";
 
 /**
  * How long an entry may sit unacknowledged before another worker takes it.
@@ -72,6 +77,12 @@ export async function flushUsage(consumer: string): Promise<FlushResult> {
 
   const collected = await collect(consumer);
   if (!collected.length) return EMPTY;
+
+  // Archived before the Chargebee splits, so history keeps the events Chargebee
+  // refuses on age. A failure here throws: nothing is acknowledged, no batch is
+  // ingested, and the next pass reclaims the whole lot. History is the read path
+  // now, so a silent gap would be visible to the subscriber.
+  await recordUsageBatch(collected.map((entry) => entry.event));
 
   // Chargebee will never accept these, and retrying only wastes attempts.
   const { fresh, expired } = splitExpired(collected);

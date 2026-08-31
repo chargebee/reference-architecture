@@ -14,6 +14,7 @@ import { getPool } from "@/lib/db";
 import { emit } from "@/lib/events/emit";
 import { ensureFreeSubscription } from "@/lib/free-subscription";
 import { entitlementsPlugin } from "@/plugins/entitlements-plugin";
+import { usagePlugin } from "@/plugins/usage-plugin";
 import { webhookCorrectnessPlugin } from "@/plugins/webhook-plugin";
 
 const baseURL = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
@@ -144,6 +145,7 @@ export const auth = betterAuth({
     // migrate/generate manages it alongside the core + plugin schema.
     webhookCorrectnessPlugin,
     entitlementsPlugin,
+    usagePlugin,
     // nextCookies must be the LAST plugin so it can wrap responses from server actions.
     nextCookies(),
   ],
