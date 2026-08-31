@@ -12,8 +12,7 @@ FROM base AS deps
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-# Locally packed unpublished dependencies must be present before installation.
-COPY vendor/*.tgz ./vendor/
+
 # Keep the pnpm store on the same filesystem as node_modules so pnpm can
 # hardlink instead of copying (avoids ~2x disk usage during install).
 RUN pnpm config set store-dir /app/.pnpm-store \

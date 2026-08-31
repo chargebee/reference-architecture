@@ -3,4 +3,4 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
 minimumReleaseAgeExclude:
-  - '@chargebee/entitlements@0.1.0-alpha.1'
+  - '@chargebee/entitlements@0.1.0-alpha.1 || 0.1.0-alpha.2'

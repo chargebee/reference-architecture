@@ -45,7 +45,7 @@ resource "aws_vpc_security_group_ingress_rule" "db_from_lambda_worker" {
 resource "aws_db_parameter_group" "app" {
   name        = "${local.name_prefix}-db-pg"
   family      = "postgres${split(".", data.aws_rds_engine_version.postgres.version)[0]}"
-  description = "Pointer Postgres parameter group: TLS enforcement and pg_cron"
+  description = "Pointer Postgres parameter group to enforce TLS"
 
   parameter {
     name  = "rds.force_ssl"
