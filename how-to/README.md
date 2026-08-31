@@ -20,4 +20,10 @@ Some topics may also contain specifics around how it is implemented in `Pointer`
 
 ## Topics
 
-1. [Integrating chargebee webhooks](./integrating-chargebee-webhooks.md)
+1. [Integrating Chargebee webhooks](./integrating-chargebee-webhooks.md)
+
+2. [Syncing and reconciling Chargebee entities](./syncing-and-reconciling-chargebee-entities.md)
+
+3. [Enforcing entitlement checks](./enforcing-entitlement-checks.md)
+
+4. [Usage based billing](./implementing-usage-based-billing.md)

@@ -4,7 +4,7 @@
 
 - [x] Show plans and allow logged in user to subscribe
 
-- [ ] Clarify the persona we target for this exercise - Architects, Solution consultants
+- [x] Clarify the persona we target for this exercise - Architects, Solution consultants
 
 - [ ] Mocking traffic: as a "authorized" user, have a few simulator options in the pointer dashboard, which can:
 
@@ -18,9 +18,9 @@
 - [ ] Add equivalents of AWS specific components for other popular cloud platforms - GCP, Azure, etc
 
 -  How-Tos:
-    - [ ] (v1) How to keep Chargebee entities in sync (subscription/plans/coupons/product catalog) - what are the schedules for updating them, and any other caching logic
+    - [x] (v1) How to keep Chargebee entities in sync (subscription/plans/coupons/product catalog) - what are the schedules for updating them, and any other caching logic
 
-    - [ ] (v1) Tracking usage locally - caching, synching with UBB, metered features, lock-out on exceeding limits, etc
+    - [x] (v1) Tracking usage locally - caching, synching with UBB, metered features, lock-out on exceeding limits, etc
 
     - [ ] Prepaid credits - where does it fit, how does it play well with the UBB usages, etc
 

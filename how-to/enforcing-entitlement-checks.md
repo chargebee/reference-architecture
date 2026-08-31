@@ -1,4 +1,4 @@
-# How to enforce entitlements at runtime
+# How to enforce entitlement checks
 
 Once subscriptions and webhooks are wired up, the next integration step is deciding what a signed-in user can do on each request. You will need runtime entitlement enforcement to:
 
