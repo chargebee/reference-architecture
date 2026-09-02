@@ -2,6 +2,34 @@
 
 This document outlines the high level architecture of the app, including it's tech stack and infrastructure.
 
+```mermaid
+flowchart LR
+  user([User])
+  subgraph chargebee[Chargebee]
+    cbapi[Chargebee API]
+    cbevents[Webhook Events]
+  end
+  subgraph aws[AWS]
+    sqs[(SQS Webhook Queue)]
+    worker[Webhook Worker]
+  end
+  subgraph data[Data Layer]
+    pg[(Postgres)]
+    redis[(Redis)]
+  end
+
+  app[Pointer App]
+  user --> app
+  app -->|Billing & <br>subscription| cbapi
+  cbapi -->|Emit billing event| cbevents
+  cbevents -->|Deliver webhook| app
+  app -->|Enqueue event| sqs
+  sqs -->|Dequeue event| worker
+  worker -->|Sync billing state| pg
+  app -->|Read/write app state| pg
+  app <-->|Read/write cache| redis
+  worker -->|Cache & <br>usage counters| redis
+```
 
 ## 1. Tech Stack
 

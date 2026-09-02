@@ -47,41 +47,17 @@ Some topics may also contain specifics around how it is implemented in `Pointer`
 | Credit based billing | Pending | |
 
 
-## Pointer
+## Reference App
 
-![](./pointer/public/pointer-lockup.svg)
+<p align="center">
+<img src="./pointer/public/pointer-lockup-white.svg" />
+</p>
 
 Pointer is our reference app which mimics a LLM provider that is PLG (product led growth) driven. It was built from the ground up with the help of coding agents. Although code was generated via LLMs, the design and how-tos are thoroughly reviewed and edited by humans.
 
 A high level overview of the pointer architecture is shown below. More details on the tech stack, components, infrastructure are detailed in [ARCHITECTURE.md](./pointer/ARCHITECTURE.md)
 
-```mermaid
-  flowchart LR
-      user([User])
-      subgraph chargebee[Chargebee]
-          cbapi[Chargebee API]
-          cbevents[Webhook Events]
-      end
-      subgraph aws[AWS]
-          sqs[(SQS Webhook Queue)]
-          worker[Webhook Worker]
-      end
-      subgraph data[Data Layer]
-          pg[(Postgres)]
-          redis[(Redis)]
-      end
-      app[Pointer App]
-      user --> app
-      app -->|Billing & <br>subscription| cbapi
-      cbapi -->|Emit billing event| cbevents
-      cbevents -->|Deliver webhook| app
-      app -->|Enqueue event| sqs
-      sqs -->|Dequeue event| worker
-      worker -->|Sync billing state| pg
-      app -->|Read/write app state| pg
-      app <-->|Read/write cache| redis
-      worker -->|Cache & <br>usage counters| redis
-```
+![pointer architecture](./pointer/public/pointer-components.png)
 
 ## Links
 
