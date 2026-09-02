@@ -2,10 +2,10 @@
 
 ## Requirements
 
-Node.js >= v22
-PNPM >= 11
-Docker
-Terraform (for deploying infra)
+* Node.js >= v22
+* PNPM >= 11
+* Docker
+* Terraform (for deploying infra)
 
 ## Getting Started
 
