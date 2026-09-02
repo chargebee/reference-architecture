@@ -240,16 +240,3 @@ same code paths — enqueue, consume, sync — are exercised end to end without 
 The Postgres image moved from the alpine variant to Debian for `pg_cron`, which changes the
 collation provider. An existing `postgresql-data` volume should be recreated
 (`docker compose down -v postgresql`) rather than reused across that switch.
-
----
-
-## 6. Where to Go Next
-
-| Topic | Document |
-| --- | --- |
-| Component boundaries & ports | [`docs/01-architecture.md`](docs/01-architecture.md) |
-| Data model | [`docs/02-data-architecture.md`](docs/02-data-architecture.md) |
-| Chargebee as source of truth | [`docs/03-chargebee-source-of-truth.md`](docs/03-chargebee-source-of-truth.md) |
-| Sequence flows | [`docs/04-sequence-flows.md`](docs/04-sequence-flows.md) |
-| Scaling & deployment | [`docs/05-scaling-and-deployment.md`](docs/05-scaling-and-deployment.md) |
-| Infrastructure (Terraform) | [`infra/README.md`](infra/README.md) |
