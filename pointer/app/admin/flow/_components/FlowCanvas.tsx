@@ -80,7 +80,17 @@ const NODES: Array<Node<StationNodeData>> = [
     id: "n_db" satisfies NodeId,
     type: "station",
     position: { x: 560, y: 400 },
-    data: { label: "Postgres", accent: "#10b981" },
+    data: { label: "Postgres", subtitle: "system of record", accent: "#10b981" },
+  },
+  {
+    id: "n_redis" satisfies NodeId,
+    type: "station",
+    position: { x: 280, y: 400 },
+    data: {
+      label: "Redis",
+      subtitle: "cache · real-time state",
+      accent: "#ef4444",
+    },
   },
 ];
 
@@ -92,6 +102,7 @@ interface StaticEdge {
   targetHandle: string;
   baseLabel: string;
   smoothstep?: boolean;
+  labelOffset?: { x: number; y: number };
 }
 
 const STATIC_EDGES: StaticEdge[] = [
@@ -101,7 +112,7 @@ const STATIC_EDGES: StaticEdge[] = [
     target: "n_app",
     sourceHandle: "s-r",
     targetHandle: "t-l",
-    baseLabel: "sign-up",
+    baseLabel: "request",
   },
   {
     id: "e_app_cbapi",
@@ -109,7 +120,7 @@ const STATIC_EDGES: StaticEdge[] = [
     target: "n_cbapi",
     sourceHandle: "s-t",
     targetHandle: "t-b",
-    baseLabel: "customer.create",
+    baseLabel: "API call",
   },
   {
     id: "e_cbapi_cbwebhook",
@@ -126,8 +137,11 @@ const STATIC_EDGES: StaticEdge[] = [
     target: "n_app",
     sourceHandle: "s-b",
     targetHandle: "t-r",
-    baseLabel: "webhook POST",
+    baseLabel: "webhook",
     smoothstep: true,
+    // Lift the chip onto the vertical leg so it clears the "enqueue" label
+    // sitting on the app → queue edge below it.
+    labelOffset: { x: 0, y: -74 },
   },
   {
     id: "e_app_queue",
@@ -151,7 +165,18 @@ const STATIC_EDGES: StaticEdge[] = [
     target: "n_db",
     sourceHandle: "s-b",
     targetHandle: "t-r",
-    baseLabel: "DB sync",
+    baseLabel: "persist",
+    smoothstep: true,
+  },
+  // Redis sits directly under the app, so this edge takes the straight drop
+  // and the Postgres edge forks off it to the right.
+  {
+    id: "e_app_redis",
+    source: "n_app",
+    target: "n_redis",
+    sourceHandle: "s-b",
+    targetHandle: "t-t",
+    baseLabel: "cache",
     smoothstep: true,
   },
   {
@@ -159,8 +184,19 @@ const STATIC_EDGES: StaticEdge[] = [
     source: "n_app",
     target: "n_db",
     sourceHandle: "s-b",
-    targetHandle: "t-l",
-    baseLabel: "INSERT user",
+    targetHandle: "t-t",
+    baseLabel: "persist",
+    smoothstep: true,
+  },
+  // Bottom-to-bottom handles route this edge underneath Postgres instead of
+  // through it, since the worker sits on the far side of the canvas.
+  {
+    id: "e_worker_redis",
+    source: "n_worker",
+    target: "n_redis",
+    sourceHandle: "s-b",
+    targetHandle: "t-b",
+    baseLabel: "cache",
     smoothstep: true,
   },
 ];
@@ -178,6 +214,7 @@ export function FlowCanvas() {
         pulses,
         smoothstep: e.smoothstep,
         activeTag: latestTag,
+        labelOffset: e.labelOffset,
       };
       return {
         id: e.id,

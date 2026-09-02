@@ -11,7 +11,9 @@ export type EdgeId =
   | "e_app_queue"
   | "e_queue_worker"
   | "e_worker_db"
-  | "e_app_db";
+  | "e_app_db"
+  | "e_app_redis"
+  | "e_worker_redis";
 
 export type NodeId =
   | "n_user"
@@ -20,7 +22,8 @@ export type NodeId =
   | "n_cbwebhook"
   | "n_queue"
   | "n_worker"
-  | "n_db";
+  | "n_db"
+  | "n_redis";
 
 export function edgesForEvent(eventType: string): EdgeId[] {
   switch (eventType) {
@@ -37,12 +40,16 @@ export function edgesForEvent(eventType: string): EdgeId[] {
     case "app.entitlements_sync_queued":
       return ["e_app_queue"];
     case "chargebee.entitlements_synced":
-      return ["e_worker_db"];
+      return ["e_worker_db", "e_worker_redis"];
+    // Entitlement checks and usage counters live in Redis, so every generate
+    // request touches the cache before it touches anything else.
     case "app.generate_requested":
     case "app.generate_denied":
     case "app.generate_completed":
     case "app.usage_threshold":
-      return ["e_user_app"];
+      return ["e_user_app", "e_app_redis"];
+    case "app.usage_ingested":
+      return ["e_app_redis"];
     default:
       return [];
   }
@@ -69,6 +76,8 @@ export function nodeForEvent(eventType: string): NodeId | null {
     case "app.generate_completed":
     case "app.usage_threshold":
       return "n_app";
+    case "app.usage_ingested":
+      return "n_redis";
     default:
       return null;
   }
@@ -118,6 +127,8 @@ export function shapeForEvent(eventType: string): ShapeStyle {
       return { shape: "circle", color: "#6366f1" }; // indigo-500
     case "app.generate_denied":
       return { shape: "triangle", color: "#ef4444" }; // red-500
+    case "app.usage_ingested":
+      return { shape: "square", color: "#ef4444" }; // red-500
     case "app.generate_requested":
     case "app.generate_completed":
     case "app.usage_threshold":

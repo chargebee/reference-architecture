@@ -17,6 +17,9 @@ export interface PulseEdgeData {
   pulses: EdgePulse[];
   smoothstep?: boolean;
   activeTag?: string;
+  // Nudges the label off the path midpoint when two edges converge on the
+  // same spot and their chips would otherwise sit on top of each other.
+  labelOffset?: { x: number; y: number };
   [key: string]: unknown;
 }
 
@@ -45,6 +48,7 @@ export function PulseEdge(props: EdgeProps & { data?: PulseEdgeData }) {
   });
 
   const pulses = data?.pulses ?? [];
+  const offset = data?.labelOffset ?? { x: 0, y: 0 };
 
   return (
     <>
@@ -58,7 +62,7 @@ export function PulseEdge(props: EdgeProps & { data?: PulseEdgeData }) {
         <div
           style={{
             position: "absolute",
-            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+            transform: `translate(-50%, -50%) translate(${labelX + offset.x}px, ${labelY + offset.y}px)`,
             pointerEvents: "none",
           }}
           className="nodrag nopan"

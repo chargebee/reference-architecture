@@ -57,7 +57,7 @@ Pointer is our reference app which mimics a LLM provider that is PLG (product le
 
 A high level overview of the pointer architecture is shown below. More details on the tech stack, components, infrastructure are detailed in [ARCHITECTURE.md](./pointer/ARCHITECTURE.md)
 
-![pointer architecture](./pointer/public/pointer-components.png)
+![pointer architecture](./pointer/public/pointer-components.svg)
 
 ## Links
 
