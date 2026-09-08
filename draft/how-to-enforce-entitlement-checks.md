@@ -302,7 +302,7 @@ async function loadCustomerEntitlements(customerId: string) {
 * If `entitlement.is_enabled === false`, the customer _does not_ have access to the entitlement, regardless of the value returned
 * Customer-level entitlements do not carry over to a new subscription, so a plan change will not move them
 
-## Pointer Implementation Notes
+## Demo App Implementation Notes
 
 Entitlements are used across the app to provide various features to the end-users. For example, a user with a free subscription gets access to a smaller list of LLM models along with a limited set of tokens and requests per month. Subscription upgrades trigger the refresh of the customer's entitlement snapshot, and the hot-path avoids hitting the Chargebee API.
 
