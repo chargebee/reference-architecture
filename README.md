@@ -6,11 +6,11 @@
   <img alt="Chargebee Reference Architecture" src="./pointer/public/banner-light.svg" width="680">
 </picture>
 
-The purpose of this repository is to showcase the best practices around integrating Chargebee as the billing solution for a high traffic SaaS platform. This is split into two distinct parts:
+The purpose of this repository is to showcase the best practices around integrating Chargebee as the billing solution for a high-traffic AI/SaaS platform. This is split into two distinct parts:
 
 - A collection of in-depth, technical how-tos which cover the Chargebee recommended best practices when integrating various billing and usage related Chargebee products
 
-- A opinionated, fully functional SaaS application built to demonstrate how these concepts translate to code
+- A opinionated, fully functional and deployable application built to demonstrate how these concepts translate to code
 
 ## Audience
 
@@ -53,7 +53,11 @@ Some topics may also contain specifics around how it is implemented in `Pointer`
 <img src="./pointer/public/pointer-lockup-white.svg" />
 </p>
 
-Pointer is our reference app which mimics a LLM provider that is PLG (product led growth) driven. It was built from the ground up with the help of coding agents. Although code was generated via LLMs, the design and how-tos are thoroughly reviewed and edited by humans.
+Pointer is our reference app which mimics a LLM/AI API provider that is PLG (product led growth) driven. It was built from the ground up with the help of coding agents and Chargebee's official libraries and SDK. Although a considerable amount of code was generated via LLMs, the architecture and design of the app, and the how-to topics themselves are completely written and reviewed by humans.
+
+The purpose of building pointer along with the how-to topics is to ensure that they cover practical aspects of integrating Chargebee with a monetizable product. While the Chargebee [docs](https://chargebee.com/docs) and [apidocs](https://apidocs.chargebee.com) serve as the main source of reference from the product and engineering teams, they don't offer a comprehensive, traceable view of how to integrate a Chargebee platform feature end-to-end.
+
+We aim to continuously evolve and expand the reference architecture as we build out Pointer with additional features - this mimics how an actual product team would go about integrating billing/subscription/entitlement/usage with their app.
 
 A high level overview of the pointer architecture is shown below. More details on the tech stack, components, infrastructure are detailed in [ARCHITECTURE.md](./pointer/ARCHITECTURE.md)
 
