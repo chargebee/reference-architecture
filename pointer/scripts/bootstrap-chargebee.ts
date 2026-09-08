@@ -316,6 +316,39 @@ async function upsertMeteredFeatures() {
 }
 
 // ---------------------------------------------------------------------------
+// Stage 7: Default Alerts
+//
+// Creates global usage_exceeded alerts at 80% for each metered feature.
+// Idempotent: skips any alert whose name already exists.
+// The default threshold is 80% — admins can change it via the /admin/alerts UI.
+// ---------------------------------------------------------------------------
+
+const DEFAULT_ALERT_THRESHOLD = 80;
+
+async function upsertDefaultAlerts() {
+  for (const feature of meteredFeatures) {
+    const name = `${feature.name} — 80% usage`;
+    const existing = await cb.alert
+      .list({ limit: 100 })
+      .then((r) => r.list.find((e) => e.alert.name === name)?.alert ?? null);
+
+    if (existing) {
+      log("ok", "alert", existing.id);
+      continue;
+    }
+
+    const created = await cb.alert.create({
+      type: "usage_exceeded",
+      name,
+      description: `Notify when ${feature.name.toLowerCase()} reaches ${DEFAULT_ALERT_THRESHOLD}% of the subscription quota.`,
+      metered_feature_id: feature.expectedId,
+      threshold: { mode: "percentage", value: DEFAULT_ALERT_THRESHOLD },
+    });
+    log("created", "alert", created.alert.id);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -327,6 +360,7 @@ async function main() {
   await upsertItemPrices();
   await upsertItemEntitlements();
   await upsertMeteredFeatures();
+  await upsertDefaultAlerts();
   console.log("[bootstrap] complete.");
 }
 
