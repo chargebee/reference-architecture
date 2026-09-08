@@ -194,10 +194,11 @@ To avoid undefined behaviour, your app has to be designed around the idea that a
 
 | Failure scenario | Impact | Remediation options |
 |------------------|--------|---------------|
-| Redis cache unreachable | Entitlements cannot be determined | 1. Fetch snapshot from DB and cache in-memory<br> 2. Use fallback, static limits |
-| Chargebee API limit exceeded | Entitlements out of sync | 1. Allow for limited overage <br> 2.  |
-| Delayed webhook processing | Entitlements/Subscriptions out of sync | |
-|
+| Redis cache unreachable | Entitlements cannot be determined | 1. Fallback to DB snapshot<br>2. Use a in-memory cache with short TTL |
+| Chargebee API limit exceeded (`api_request_limit_exceeded`, HTTP 429) | Refresh fails, snapshot goes stale | 1. Honour `Retry-After`, then exponential backoff with jitter<br>2 Retry in the background<br>3. Avoid duplicate requests for same subscription  |
+| Chargebee returns 5xx (`internal_temporary_error`, `site_read_only_mode`) | Refresh fails | 1. Treat as retryable and keep the last-known-good snapshot<br>2. Never write a partial or empty snapshot on a failed fetch |
+| Webhook endpoint down | Chargebee retries 7 times over ~3 days 7 hours, then the event is lost | 1. Return 200 as soon as the event is durably queued<br>2. Reconcile on a schedule so a lost event self-heals |
+| Worker backlog | Snapshots silently age | Alert on queue lag and on snapshot age, not just on errors |
 
 Depending on how expensive it is to serve a user's request, you may broadly choose to deny or allow access in the case of a component failure.
 
@@ -255,7 +256,6 @@ Chargebee exposed two APIs to fetch the entitlements for a customer:
 | Consolidation | By your app | By Chargebee API when `consolidate_entitlements=true`
 | Extra fields | `feature_name`, `feature_type`, `is_overridden`, `expires_at` | `customer_id`, `subscription_id` |
 | Webhook Events | `subscription_entitlements_created`, `subscription_entitlements_updated` | `customer_entitlements_updated` |
-|
 
 The choice of which method to use to fetch and determine user entitlements is dependent on various product and business factors. However, in simple terms:
 
@@ -314,7 +314,7 @@ Some relevant files to look into the hood:
 
 - [`pointer/lib/entitlements/gate.ts`](../pointer/lib/entitlements/gate.ts) — Feature specific gates. Throws `EntitlementGateError` with `429` and `retryAfterSeconds` for a rate limit, `402` for an exhausted quota or a model the plan does not include.
 
-- [`pointer/lib/entitlements/sync.ts`](../pointer/lib/entitlements/sync.ts), - [`pointer/lib/entitlements/queue.ts`] — Background sync logic.
+- [`pointer/lib/entitlements/sync.ts`](../pointer/lib/entitlements/sync.ts), [`pointer/lib/entitlements/queue.ts`](../pointer/lib/entitlements/queue.ts) — Background sync logic.
 
 - [`pointer/app/api/entitlements/checkout-complete/route.ts`](../pointer/app/api/entitlements/checkout-complete/route.ts) — Optimistic refresh after subscription checkout succeeds, rather than waiting for the webhook event.
 
