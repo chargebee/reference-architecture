@@ -3,8 +3,8 @@
 Webhooks are usually the first thing you build after the Chargebee SDK is wired up. This topic covers using them to:
 
 * Keep your app's copy of customers, subscriptions and invoices in sync with your Chargebee site
-* Trigger your own work when a payment, renewal or plan change happens
-* Recover the outcome of a billing flow when the customer closes the browser mid-checkout
+* Trigger your own jobs when a payment, renewal or plan change happens
+* Recover from a partial or failed user checkout
 
 **Important**: Chargebee is the source of truth for billing state. Your app keeps a local mirror of it. The webhook endpoint's only job is to accept the event and make it durable. Everything else happens in a background worker.
 
@@ -236,12 +236,6 @@ If you already run on AWS and your event volume is high, [Event Streaming via AW
 ⚠️ **Not recommended**: Pointing several services at the same endpoint and fanning out from there without a queue. One slow consumer then times out the webhook for everyone.
 
 ## See It Running In The Demo App
-
-[Pointer](https://pointer.chargebee-labs.com) is an AI coding assistant with a free tier. A developer signs up, uses their daily token allowance, and upgrades to Pro to keep going. Chargebee runs the checkout and the charge — the webhook is how Pointer finds out the plan changed and raises the limit, seconds later, without polling.
-
-The `/admin/flow` view in the demo animates that path live: the event arriving, the queue hop, the worker applying it, and the retry when a dependency is not ready yet.
-
-Pointer runs Next.js, Postgres and AWS SQS, and uses the Better Auth Chargebee plugin. Those are its choices, not Chargebee requirements.
 
 - [`pointer/lib/webhooks.ts`](../pointer/lib/webhooks.ts) — the endpoint's publish step. Sends the validated event to SQS using the event `id` as the dedupe key, then returns.
 

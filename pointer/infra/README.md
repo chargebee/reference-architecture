@@ -2,7 +2,7 @@
 
 Terraform stack for the `pointer` Next.js app: VPC, ALB, ACM, Route53, ECS Fargate, optional Lambda worker, ECR, RDS Postgres, SQS + DLQ.
 
-Public URL after apply: `https://pointer.localcblabs.com`.
+Public URL after apply: `https://pointer.chargebee-labs.com`.
 
 ## Layout
 
@@ -21,7 +21,7 @@ pointer/infra/
 | Network | `pointer-vpc` (10.20.0.0/16), IGW, 2 public subnets; Lambda mode adds 2 private subnets and one NAT gateway |
 | ALB | `pointer-alb` with HTTPS (TLS 1.2+), HTTP -> HTTPS redirect, target group `pointer-tg` |
 | Cert | Looks up the existing `*.localcblabs.com` ACM cert by domain (not managed by this stack) |
-| DNS | A-alias record `pointer.localcblabs.com` -> ALB |
+| DNS | A-alias record `pointer.chargebee-labs.com` -> ALB |
 | ECR | `pointer-app` repo (AES256, scan-on-push) |
 | ECS | `pointer-cluster`, `pointer-app` Fargate service (1 task, 512 CPU / 1024 MiB, port 3000) |
 | Worker | `pointer-worker` runs as either an ECS Fargate service with queue-depth autoscaling (default), or an SQS-triggered ARM64 Lambda |
@@ -266,7 +266,7 @@ secret ARNs; its handler loads and validates both JSON values at cold start.
 | `AWS_REGION` | `<region>` |
 | `CHARGEBEE_WEBHOOK_SQS_QUEUE_URL` | primary queue URL |
 | `CHARGEBEE_WEBHOOK_DLQ_URL` | dead-letter queue URL |
-| `BETTER_AUTH_URL` | `https://pointer.localcblabs.com` |
+| `BETTER_AUTH_URL` | `https://pointer.chargebee-labs.com` |
 
 **Injected from Secrets Manager (decrypted by the ECS execution role at task start):**
 

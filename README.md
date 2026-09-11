@@ -53,10 +53,14 @@ These topics are written in plain markdown with mermaid diagrams wherever possib
 ## Reference App
 
 <p align="center">
-<img src="./pointer/public/pointer-lockup-white.svg" />
+  <a href="https://pointer.chargebee-labs.com" target="_blank">
+    <img src="./pointer/public/pointer-lockup-white.svg" />
+  </a>
 </p>
 
-Pointer is our reference app which mimics a LLM/AI API provider that is PLG (product led growth) driven. It was built from the ground up with the help of coding agents and Chargebee's official libraries and SDK. Although a considerable amount of code was generated via LLMs, the architecture and design of the app, and the how-to topics themselves are completely written and reviewed by humans.
+[Pointer](https://pointer.chargebee-labs.com) is our reference app which mimics a LLM/AI API provider that is PLG (product led growth) driven. A developer signs up, uses their daily token allowance, and upgrades to Pro to keep going. Chargebee handles the subscription, entitlements, usage tracking and alerts.
+
+It was built from the ground up with the help of coding agents and Chargebee's official libraries and SDK. Although a considerable amount of code was generated via LLMs, the architecture and design of the app, and the how-to topics themselves are completely written and reviewed by humans.
 
 The purpose of building pointer along with the how-to topics is to ensure that they cover practical aspects of integrating Chargebee with a monetizable product. While the Chargebee [docs](https://chargebee.com/docs) and [apidocs](https://apidocs.chargebee.com) serve as the main source of reference from the product and engineering teams, they don't offer a comprehensive, traceable view of how to integrate a Chargebee platform feature end-to-end.
 

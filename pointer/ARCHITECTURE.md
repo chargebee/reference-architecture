@@ -1,116 +1,64 @@
 # Pointer — Architecture Overview
 
+Pointer is a reference SaaS application which integrates with Chargebee for subscription billing and OpenRouter for AI text generation.
+
 This document outlines the high level architecture of the app, including it's tech stack and infrastructure.
 
+## Overview
+
 ```mermaid
-flowchart LR
-  user([User])
-  subgraph chargebee[Chargebee]
-    cbapi[Chargebee API]
-    cbevents[Webhook Events]
-  end
-  subgraph aws[AWS]
-    sqs[(SQS Webhook Queue)]
-    worker[Webhook Worker]
-  end
-  subgraph data[Data Layer]
-    pg[(Postgres)]
-    redis[(Redis)]
+flowchart TB
+  User([Browser User])
+  Admin([Browser Admin])
+
+  subgraph Platform["Pointer Platform"]
+      App["pointer-app<br/>(Next.js 16 + Better Auth)"]
+      Worker["pointer-worker<br/>(SQS Consumer + Usage Loop)"]
+      Queue[["AWS SQS<br/>(Main Queue + DLQ)"]]
+      PG[("PostgreSQL 18<br/>(Mirror & Archive)")]
+      Redis[("Redis 8<br/>(Cache, Counters & Streams)")]
   end
 
-  app[Pointer App]
-  user --> app
-  app -->|Billing & <br>subscription| cbapi
-  cbapi -->|Emit billing event| cbevents
-  cbevents -->|Deliver webhook| app
-  app -->|Enqueue event| sqs
-  sqs -->|Dequeue event| worker
-  worker -->|Sync billing state| pg
-  app -->|Read/write app state| pg
-  app <-->|Read/write cache| redis
-  worker -->|Cache & <br>usage counters| redis
+  subgraph ThirdParty["Third-Party Services"]
+      CB["Chargebee<br/>(Billing Engine)"]
+      OR["OpenRouter<br/>(Model Provider)"]
+  end
+
+  style ThirdParty fill:#DDDDDD,stroke:#faad14,stroke-width:1.5px,stroke-dasharray: 4 4
+  style CB fill:#fff7e6,stroke:#d46b08,stroke-width:1.5px
+  style OR fill:#fff7e6,stroke:#d46b08,stroke-width:1.5px
+
+  User -->|Web & API requests| App
+  Admin -->|Live flow UI| App
+  App -->|Create customer / portal session| CB
+  CB -->|Webhook events| App
+  App -->|Enqueue webhooks| Queue
+  Queue -->|Consume events| Worker
+  Worker -->|Sync billing & archive usage| PG
+  Worker -->|Batch ingest usage| CB
+  App -->|Stream generation| OR
+  App <-->|App state & billing mirror| PG
+  App <-->|Quota checks & usage buffer| Redis
+  Worker <-->|Drain buffer & emit events| Redis
 ```
 
-## 1. Tech Stack
+
+## Tech Stack
 
 | Layer | Technology | Role |
 | --- | --- | --- |
 | Web + API | **Next.js 16** (App Router, standalone build), **React 19** | Renders the UI and hosts all HTTP endpoints |
 | Auth | **Better Auth** | Email/password, 2FA, bearer tokens, organizations, admin |
 | Billing | **Chargebee** + [@chargebee/better-auth](https://npmx.dev/@chargebee/better-auth) plugin | Customer/subscription lifecycle and webhook sync |
+| Model Provider | **OpenRouter** + `@openrouter/ai-sdk-provider` | External streaming text generation provider |
 | Primary DB | **PostgreSQL 18** (via `pg` + Kysely) | Users, sessions, orgs, subscription mirror, usage archive |
 | Cache + streams | **Redis 8** (`ioredis`) | Idempotency helpers, usage counters, the usage-event buffer, and the live event stream |
-| Async transport | **AWS SQS** (+ DLQ), `sqs-consumer` | Buffers Chargebee webhooks for the worker |
+| Async Queue | **AWS SQS** (+ DLQ), `sqs-consumer` | Buffers Chargebee webhooks for the worker |
 | Background jobs | Standalone Node process (`tsx`) | Consumes SQS and applies DB sync |
 
----
+## Components
 
-## 2. Component Diagram
-
-```mermaid
-flowchart LR
-    User(["Browser / User"])
-    CB["Chargebee<br/>(billing system of record)"]
-
-    subgraph AWS["AWS (ECS Fargate)"]
-        subgraph App["pointer-app (Next.js)"]
-            Web["Web UI + Auth<br/>(Better Auth)"]
-            WHIn["Webhook endpoint<br/>validate + enqueue"]
-            SSE["/api/events/stream<br/>(SSE)"]
-        end
-        Worker["pointer-worker<br/>SQS consumer +<br/>correctness pipeline<br/>+ usage flush loop"]
-    end
-
-    Queue[["SQS queue"]]
-    DLQ[["SQS DLQ"]]
-    PG[("PostgreSQL<br/>RDS")]
-    Redis[("Redis<br/>streams + cache")]
-
-    User -->|"HTTPS (via ALB)"| Web
-    Web -->|"create customer / subscription"| CB
-    Web --> PG
-    Web -->|"publish events"| Redis
-    Web -->|"buffer usage events"| Redis
-    Web -->|"read usage history"| PG
-    SSE -->|"subscribe"| Redis
-    User -->|"live flow view"| SSE
-
-    CB -->|"webhook (Basic Auth)"| WHIn
-    WHIn -->|"enqueue"| Queue
-    Queue -->|"long-poll"| Worker
-    Worker -->|"plugin DB-sync hooks"| PG
-    Worker -->|"poison / exhausted"| DLQ
-    Worker -->|"publish events"| Redis
-    Redis -->|"drain buffer"| Worker
-    Worker -->|"archive usage events"| PG
-    Worker -->|"batch ingest usage"| CB
-```
-
-**Reading the diagram**
-
-- **Synchronous path (blue in your head):** the browser hits the app through the ALB.
-  Better Auth handles sign-up/sign-in and, on sign-up, calls Chargebee to create a matching
-  customer plus an idempotent free subscription. Upgrades and billing-portal actions also go
-  straight to Chargebee via the SDK.
-- **Asynchronous path:** Chargebee calls back with webhooks. The app endpoint authenticates
-  and enqueues them to SQS, then returns `2xx` immediately. The worker picks them up and
-  applies changes to Postgres. Once `subscription_created` has established the local
-  subscription row, the worker queues a second job to fetch and persist its entitlements.
-- **Usage path:** each settled generation is appended to a Redis stream. The worker drains it
-  into two sinks in one pass: a weekly-partitioned Postgres table, then Chargebee's batch
-  ingest API. Quotas are still enforced locally from Redis counters; Postgres holds the
-  history those counters discard at each period reset, and serves the usage page. Chargebee
-  remains the billing system of record, but its API quota is a billing budget and is not
-  spent on a page a subscriber refreshes several times a day.
-- **Observation tap:** every meaningful step emits an event onto a Redis stream. The
-  `/admin/flow` page subscribes over Server-Sent Events to animate the system live — it is
-  purely for demonstration and never on the critical path.
-
----
-
-## 3. Core Components
-
-### 3.1 `pointer-app` (Next.js)
+### 3.1 `pointer-app`
 
 The single web/API application. It is responsible for:
 
@@ -126,7 +74,7 @@ The single web/API application. It is responsible for:
 - **Live event stream** — publishes domain events to a Redis stream and exposes them over SSE
   for the `/admin/flow` visualization.
 
-### 3.2 `pointer-worker` (selectable SQS consumer)
+### 3.2 `pointer-worker`
 
 The worker owns all webhook-driven database sync and can run as either an ECS service (the
 default) or an SQS-triggered Lambda function, selected by Terraform's `worker_runtime`
@@ -198,7 +146,6 @@ The external billing **system of record**. The app never treats its local Postgr
 authoritative for billing state — it mirrors Chargebee via webhooks and reconciles using
 resource versions. See [`docs/03-chargebee-source-of-truth.md`](docs/03-chargebee-source-of-truth.md).
 
----
 
 ## 4. Infrastructure
 
@@ -208,7 +155,7 @@ infra README.
 
 ```mermaid
 flowchart TB
-    Route53["Route53<br/>pointer.localcblabs.com"] --> ALB["ALB<br/>HTTPS, TLS 1.2+"]
+    Route53["Route53<br/>pointer.chargebee-labs.com"] --> ALB["ALB<br/>HTTPS, TLS 1.2+"]
     ALB --> AppSvc["ECS service: pointer-app<br/>Fargate (Next.js :3000)"]
     subgraph ECS["ECS Fargate cluster (pointer-cluster)"]
         AppSvc
@@ -227,7 +174,7 @@ flowchart TB
 | Area | What runs |
 | --- | --- |
 | **Network** | `pointer-vpc` (10.20.0.0/16), Internet Gateway, 2 public subnets across 2 AZs |
-| **Edge** | ALB (HTTPS only, HTTP→HTTPS redirect); Route53 alias to `pointer.localcblabs.com`; ACM cert looked up |
+| **Edge** | ALB (HTTPS only, HTTP→HTTPS redirect); Route53 alias to `pointer.chargebee-labs.com`; ACM cert looked up |
 | **Compute** | ECS Fargate cluster with `pointer-app` (web), `pointer-worker` (webhook consumer), and a short-lived `pointer-app-migrate` task |
 | **Images** | ECR repo `pointer-app`; a slim standalone `:latest` for the app, a `builder` image for worker + migrations |
 | **Data** | RDS Postgres (`db.t4g.micro`, single-AZ, encrypted at rest, TLS enforced) |
@@ -235,36 +182,8 @@ flowchart TB
 | **Secrets** | Secrets Manager holds DB credentials and app/Chargebee secrets, injected into tasks at start |
 | **Logs** | CloudWatch log groups per service (14-day retention) |
 
-**Deploy shape.** A new image is built and pushed to ECR, Better Auth migrations run as a
-one-off Fargate task against the new schema, then the `pointer-app` and `pointer-worker`
-services are rolled onto the new image.
+**Deployment:** A new image is built and pushed to ECR, Better Auth migrations run as a one-off Fargate task against the new schema, then the `pointer-app` and `pointer-worker` services are rolled onto the new image.
 
-**Worker autoscaling.** The worker scales on SQS backlog
-(`ApproximateNumberOfMessagesVisible`): scale out when the queue is deep, scale in when it
-drains, within configurable min/max bounds — so webhook bursts are absorbed without touching
-the web tier.
+**Autoscaling:** The worker scales on SQS backlog(`ApproximateNumberOfMessagesVisible`): scale out when the queue is deep, scale in when it drains, within configurable min/max bounds — so webhook bursts are absorbed without touching the web tier.
 
-**Security baseline.** Encryption at rest (RDS/SQS/Secrets/ECR) and in transit (ALB TLS 1.2+,
-RDS `force_ssl`), security groups that reference each other rather than open CIDRs, RDS not
-publicly reachable, and IAM scoped to specific secret and queue ARNs.
-
----
-
-## 5. Local Development
-
-`docker-compose.yaml` brings up the full dependency set offline:
-
-- **Postgres 18** on `:5432`, built from [`docker/postgres`](docker/postgres) so it carries
-  `pg_cron` (the stock image does not) and loads it with the same settings as the RDS
-  parameter group
-- **Redis 8** on `:6379`
-- **LocalStack** on `:4566` providing SQS, with the webhook queue + DLQ created on startup
-  (mirroring `infra/sqs.tf`)
-
-Apply the schema with `pnpm db:migrate:local`, run the app with `next dev`, and the worker
-with `pnpm worker:chargebee`. This mirrors the production topology closely enough that the
-same code paths — enqueue, consume, sync — are exercised end to end without any AWS account.
-
-The Postgres image moved from the alpine variant to Debian for `pg_cron`, which changes the
-collation provider. An existing `postgresql-data` volume should be recreated
-(`docker compose down -v postgresql`) rather than reused across that switch.
+**Security** Encryption at rest (RDS/SQS/Secrets/ECR) and in transit (ALB TLS 1.2+, RDS `force_ssl`), security groups that reference each other rather than open CIDRs, RDS not publicly reachable, and IAM scoped to specific secret and queue ARNs.
