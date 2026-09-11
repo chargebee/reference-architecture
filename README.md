@@ -26,25 +26,28 @@ The topics below cover the best practices to achieve the required outcome and ar
 
 Regardless of your tech stack or hosting platform, each how-to covers the functional/non-functional requirements and a production go-live checklist to help you along the journey.
 
-Each how-to doc outlines:
+Each how-to is broken down into self-contained topics which addresses a specific scenario. It can include:
 
-- A high level architecture showing relevant components, and how data flows between them for specific scenarios
+- Architecture or flow diagrams
+
+- Pseudocode showing how certain cases maybe structured in code
 
 - Best practices to keep in mind, and testing scenarios which are useful in validating your implementation
 
+- Do's and Dont's
+
+- An overview of how that topic is implemented in the demo app along with the relevant source files to look at
+
 - A go-live checklist of must do steps to pay attention to before your app gets deployed to production environments
 
-Some topics may also contain specifics around how it is implemented in `Pointer`.
+These topics are written in plain markdown with mermaid diagrams wherever possible. It is written and edited by humans, but can be consumed by agents as well.
 
 ### Index
 
 | Topic | Status | Last Updated |
 |-------|--------|--------------|
-| [Integrating Chargebee webhooks](./how-to/integrating-chargebee-webhooks.md) | Draft | |
-| [Syncing and reconciling Chargebee entities](./how-to/syncing-and-reconciling-chargebee-entities.md) | Draft | |
-| [Enforcing entitlement checks](./how-to/enforcing-entitlement-checks.md) | Draft | |
-| [Usage based billing](./how-to/implementing-usage-based-billing.md) | Draft | |
-| Credit based billing | Pending | |
+| [Integrating Chargebee webhooks](./how-to/webhooks.md) | In Review | |
+| [Enforcing entitlement checks](./how-to/entitlement-checks.md) | In Review | |
 
 
 ## Reference App
