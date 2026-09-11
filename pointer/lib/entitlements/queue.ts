@@ -25,60 +25,60 @@ export const ENTITLEMENT_SYNC_JOB = "entitlements.sync";
 export type EntitlementSyncJobReason = "subscription_created" | "manual";
 
 export interface EntitlementSyncJob {
-  job: typeof ENTITLEMENT_SYNC_JOB;
-  /** Doubles as the trace id for every event the job emits. */
-  id: string;
-  requestedAt: string;
-  reason: EntitlementSyncJobReason;
-  chargebeeSubscriptionId: string;
+	job: typeof ENTITLEMENT_SYNC_JOB;
+	/** Doubles as the trace id for every event the job emits. */
+	id: string;
+	requestedAt: string;
+	reason: EntitlementSyncJobReason;
+	chargebeeSubscriptionId: string;
 }
 
 export function isEntitlementSyncJob(
-  value: unknown,
+	value: unknown,
 ): value is EntitlementSyncJob {
-  if (!value || typeof value !== "object") return false;
-  const candidate = value as Partial<EntitlementSyncJob>;
-  return (
-    candidate.job === ENTITLEMENT_SYNC_JOB &&
-    typeof candidate.id === "string" &&
-    typeof candidate.requestedAt === "string" &&
-    (candidate.reason === "subscription_created" ||
-      candidate.reason === "manual") &&
-    typeof candidate.chargebeeSubscriptionId === "string"
-  );
+	if (!value || typeof value !== "object") return false;
+	const candidate = value as Partial<EntitlementSyncJob>;
+	return (
+		candidate.job === ENTITLEMENT_SYNC_JOB &&
+		typeof candidate.id === "string" &&
+		typeof candidate.requestedAt === "string" &&
+		(candidate.reason === "subscription_created" ||
+			candidate.reason === "manual") &&
+		typeof candidate.chargebeeSubscriptionId === "string"
+	);
 }
 
 export async function enqueueEntitlementSync(
-  input: Omit<EntitlementSyncJob, "job" | "id" | "requestedAt">,
+	input: Omit<EntitlementSyncJob, "job" | "id" | "requestedAt">,
 ): Promise<EntitlementSyncJob> {
-  const job: EntitlementSyncJob = {
-    job: ENTITLEMENT_SYNC_JOB,
-    id: uuidv7(),
-    requestedAt: new Date().toISOString(),
-    ...input,
-  };
+	const job: EntitlementSyncJob = {
+		job: ENTITLEMENT_SYNC_JOB,
+		id: uuidv7(),
+		requestedAt: new Date().toISOString(),
+		...input,
+	};
 
-  const queueUrl = getWebhookQueueUrl();
-  const fifo = isFifoQueue(queueUrl);
+	const queueUrl = getWebhookQueueUrl();
+	const fifo = isFifoQueue(queueUrl);
 
-  await getSqsClient().send(
-    new SendMessageCommand({
-      QueueUrl: queueUrl,
-      MessageBody: JSON.stringify(job),
-      MessageDeduplicationId: fifo ? job.id : undefined,
-      MessageGroupId: fifo ? "chargebee-webhooks" : undefined,
-    }),
-  );
+	await getSqsClient().send(
+		new SendMessageCommand({
+			QueueUrl: queueUrl,
+			MessageBody: JSON.stringify(job),
+			MessageDeduplicationId: fifo ? job.id : undefined,
+			MessageGroupId: fifo ? "chargebee-webhooks" : undefined,
+		}),
+	);
 
-  await emit(
-    "app.entitlements_sync_queued",
-    {
-      job_id: job.id,
-      reason: job.reason,
-      chargebee_subscription_id: job.chargebeeSubscriptionId,
-    },
-    { source: "app", trace_id: job.id },
-  );
+	await emit(
+		"app.entitlements_sync_queued",
+		{
+			job_id: job.id,
+			reason: job.reason,
+			chargebee_subscription_id: job.chargebeeSubscriptionId,
+		},
+		{ source: "app", trace_id: job.id },
+	);
 
-  return job;
+	return job;
 }

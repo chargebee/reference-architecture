@@ -14,6 +14,7 @@ import { hostname } from "node:os";
 
 import { usageIngestEnabled } from "@/lib/usage/events";
 import { flushUsage, type FlushResult } from "@/lib/usage/flush";
+import process from "node:process";
 
 const DEFAULT_INTERVAL_MS = 60_000;
 /** A backlog needs many passes; drain it promptly instead of one batch a minute. */
@@ -25,68 +26,68 @@ const BACKLOG_INTERVAL_MS = 1_000;
  * retry a broken upstream every second, so the fast path needs both.
  */
 export function nextDelay(result: FlushResult, idle: number): number {
-  const settled = result.ingested + result.expired + result.exhausted;
-  return result.depth > 0 && settled > 0 ? BACKLOG_INTERVAL_MS : idle;
+	const settled = result.ingested + result.expired + result.exhausted;
+	return result.depth > 0 && settled > 0 ? BACKLOG_INTERVAL_MS : idle;
 }
 
 function intervalMs(): number {
-  const configured = Number(process.env.USAGE_FLUSH_INTERVAL_MS);
-  return Number.isFinite(configured) && configured > 0
-    ? configured
-    : DEFAULT_INTERVAL_MS;
+	const configured = Number(process.env.USAGE_FLUSH_INTERVAL_MS);
+	return Number.isFinite(configured) && configured > 0
+		? configured
+		: DEFAULT_INTERVAL_MS;
 }
 
 export type UsageFlushLoop = { stop: () => Promise<void> };
 
 export function startUsageFlushLoop(): UsageFlushLoop {
-  // Identifies this task in the consumer group's pending list, so entries it
-  // was holding when it died are attributable and reclaimable.
-  const consumer = `${hostname()}-${process.pid}`;
-  const tick = intervalMs();
+	// Identifies this task in the consumer group's pending list, so entries it
+	// was holding when it died are attributable and reclaimable.
+	const consumer = `${hostname()}-${process.pid}`;
+	const tick = intervalMs();
 
-  let stopped = false;
-  let running: Promise<void> = Promise.resolve();
-  let timer: NodeJS.Timeout | undefined;
+	let stopped = false;
+	let running: Promise<void> = Promise.resolve();
+	let timer: NodeJS.Timeout | undefined;
 
-  const schedule = (delay: number) => {
-    if (stopped) return;
-    timer = setTimeout(pass, delay);
-  };
+	const schedule = (delay: number) => {
+		if (stopped) return;
+		timer = setTimeout(pass, delay);
+	};
 
-  const pass = () => {
-    running = (async () => {
-      try {
-        const result = await flushUsage(consumer);
-        if (result.ingested || result.expired || result.exhausted) {
-          console.log("[usage-flush]", result);
-        }
-        schedule(nextDelay(result, tick));
-      } catch (err) {
-        console.error("[usage-flush] pass failed", err);
-        schedule(tick);
-      }
-    })();
-  };
+	const pass = () => {
+		running = (async () => {
+			try {
+				const result = await flushUsage(consumer);
+				if (result.ingested || result.expired || result.exhausted) {
+					console.log("[usage-flush]", result);
+				}
+				schedule(nextDelay(result, tick));
+			} catch (err) {
+				console.error("[usage-flush] pass failed", err);
+				schedule(tick);
+			}
+		})();
+	};
 
-  schedule(tick);
-  console.log(`[usage-flush] every ${tick}ms as ${consumer}`);
+	schedule(tick);
+	console.log(`[usage-flush] every ${tick}ms as ${consumer}`);
 
-  return {
-    // Let the in-flight pass settle so its batch is acknowledged rather than
-    // left pending for another worker to reclaim.
-    stop: async () => {
-      stopped = true;
-      if (timer) clearTimeout(timer);
-      await running;
-    },
-  };
+	return {
+		// Let the in-flight pass settle so its batch is acknowledged rather than
+		// left pending for another worker to reclaim.
+		stop: async () => {
+			stopped = true;
+			if (timer) clearTimeout(timer);
+			await running;
+		},
+	};
 }
 
 /** No-op when usage tracking is unconfigured, so the worker boots unchanged. */
 export function startUsageFlushIfEnabled(): UsageFlushLoop | null {
-  if (!usageIngestEnabled()) {
-    console.log("[usage-flush] disabled (CHARGEBEE_USAGE_INGEST_ENABLED)");
-    return null;
-  }
-  return startUsageFlushLoop();
+	if (!usageIngestEnabled()) {
+		console.log("[usage-flush] disabled (CHARGEBEE_USAGE_INGEST_ENABLED)");
+		return null;
+	}
+	return startUsageFlushLoop();
 }

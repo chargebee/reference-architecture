@@ -12,6 +12,7 @@
  */
 
 import type { UsageEventProperties } from "@/scripts/catalog";
+import process from "node:process";
 
 /**
  * A generation, as buffered. Mirrors the batch-ingest wire shape so the flush
@@ -22,16 +23,16 @@ import type { UsageEventProperties } from "@/scripts/catalog";
  * measured from this value.
  */
 export type BufferedUsageEvent = {
-  /**
-   * Chargebee's `deduplication_id`, capped at 36 characters. The generation's
-   * uuidv7 trace id is exactly 36, and already unique per request, so a
-   * replayed batch collapses to a no-op on Chargebee's side.
-   */
-  deduplicationId: string;
-  subscriptionId: string;
-  /** Epoch milliseconds, as the ingest API requires. */
-  usageTimestamp: number;
-  properties: UsageEventProperties;
+	/**
+	 * Chargebee's `deduplication_id`, capped at 36 characters. The generation's
+	 * uuidv7 trace id is exactly 36, and already unique per request, so a
+	 * replayed batch collapses to a no-op on Chargebee's side.
+	 */
+	deduplicationId: string;
+	subscriptionId: string;
+	/** Epoch milliseconds, as the ingest API requires. */
+	usageTimestamp: number;
+	properties: UsageEventProperties;
 };
 
 /**
@@ -40,23 +41,23 @@ export type BufferedUsageEvent = {
  * unconfigured environments neither buffer events nor start the flush loop.
  */
 export function usageIngestEnabled(): boolean {
-  return process.env.CHARGEBEE_USAGE_INGEST_ENABLED === "true";
+	return process.env.CHARGEBEE_USAGE_INGEST_ENABLED === "true";
 }
 
 export async function recordUsageEvent(
-  event: BufferedUsageEvent,
+	event: BufferedUsageEvent,
 ): Promise<void> {
-  if (!usageIngestEnabled()) return;
+	if (!usageIngestEnabled()) return;
 
-  try {
-    // Lazy-imported for the same reason as the event bus: keep ioredis out of
-    // the static import graph of the generation path.
-    const { appendUsageEvent } = await import("./stream");
-    await appendUsageEvent(event);
-  } catch (err) {
-    console.error(
-      `[usage] failed to buffer event ${event.deduplicationId}`,
-      err,
-    );
-  }
+	try {
+		// Lazy-imported for the same reason as the event bus: keep ioredis out of
+		// the static import graph of the generation path.
+		const { appendUsageEvent } = await import("./stream");
+		await appendUsageEvent(event);
+	} catch (err) {
+		console.error(
+			`[usage] failed to buffer event ${event.deduplicationId}`,
+			err,
+		);
+	}
 }

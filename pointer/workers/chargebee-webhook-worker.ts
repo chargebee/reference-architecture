@@ -38,17 +38,16 @@
 import { SQSClient } from "@aws-sdk/client-sqs";
 import { Consumer } from "sqs-consumer";
 
-import {
-  createChargebeeWebhookMessageProcessor,
-} from "./chargebee-webhook-processor";
+import { createChargebeeWebhookMessageProcessor } from "./chargebee-webhook-processor";
 import { startUsageFlushIfEnabled } from "./usage-flush-loop";
+import process from "node:process";
 
 function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`${name} environment variable is required`);
-  }
-  return value;
+	const value = process.env[name];
+	if (!value) {
+		throw new Error(`${name} environment variable is required`);
+	}
+	return value;
 }
 
 const queueUrl = requireEnv("CHARGEBEE_WEBHOOK_SQS_QUEUE_URL");
@@ -56,37 +55,37 @@ const dlqUrl = requireEnv("CHARGEBEE_WEBHOOK_DLQ_URL");
 
 const sqs = new SQSClient();
 const processMessage = createChargebeeWebhookMessageProcessor({
-  queueUrl,
-  dlqUrl,
-  sqs,
+	queueUrl,
+	dlqUrl,
+	sqs,
 });
 
 const consumer = Consumer.create({
-  queueUrl,
-  sqs,
-  batchSize: 10,
-  waitTimeSeconds: 20,
-  visibilityTimeout: 30,
-  heartbeatInterval: 10,
-  // Expose the delivery count so we can drive an increasing retry backoff.
-  messageSystemAttributeNames: ["ApproximateReceiveCount"],
-  handleMessage: async (message) => {
-    await processMessage(message);
-    return message;
-  },
+	queueUrl,
+	sqs,
+	batchSize: 10,
+	waitTimeSeconds: 20,
+	visibilityTimeout: 30,
+	heartbeatInterval: 10,
+	// Expose the delivery count so we can drive an increasing retry backoff.
+	messageSystemAttributeNames: ["ApproximateReceiveCount"],
+	handleMessage: async (message) => {
+		await processMessage(message);
+		return message;
+	},
 });
 
 consumer.on("error", (err) => {
-  console.error("[chargebee-worker] error", err);
+	console.error("[chargebee-worker] error", err);
 });
 consumer.on("processing_error", (err, msg) => {
-  console.error("[chargebee-worker] processing_error", {
-    messageId: msg?.MessageId,
-    err,
-  });
+	console.error("[chargebee-worker] processing_error", {
+		messageId: msg?.MessageId,
+		err,
+	});
 });
 consumer.on("timeout_error", (err) => {
-  console.error("[chargebee-worker] timeout_error", err);
+	console.error("[chargebee-worker] timeout_error", err);
 });
 
 // Usage batching rides this process rather than its own service: the flush is
@@ -95,10 +94,10 @@ consumer.on("timeout_error", (err) => {
 const usageFlush = startUsageFlushIfEnabled();
 
 const shutdown = (signal: string) => {
-  console.log(`[chargebee-worker] ${signal} received, draining...`);
-  // abort: false => let in-flight handlers finish before stopping.
-  consumer.stop({ abort: true });
-  void usageFlush?.stop();
+	console.log(`[chargebee-worker] ${signal} received, draining...`);
+	// abort: false => let in-flight handlers finish before stopping.
+	consumer.stop({ abort: true });
+	void usageFlush?.stop();
 };
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));

@@ -38,7 +38,7 @@ const CRON_JOB_NAME = "usage-event-partitions";
  * idempotent, so a re-run is a no-op.
  */
 const TABLE_STATEMENTS = [
-  `CREATE TABLE IF NOT EXISTS usage_event (
+	`CREATE TABLE IF NOT EXISTS usage_event (
      "deduplicationId" text        NOT NULL,
      "subscriptionId"  text        NOT NULL,
      "usageTimestamp"  timestamptz NOT NULL,
@@ -50,19 +50,19 @@ const TABLE_STATEMENTS = [
      "planId"          text        NOT NULL
    ) PARTITION BY RANGE ("usageTimestamp")`,
 
-  // Created before any weekly partition so a write arriving mid-migration has
-  // somewhere to land. Caveat: once it holds rows for week W, creating W's
-  // partition fails, and recovery is a manual DETACH and re-insert.
-  `CREATE TABLE IF NOT EXISTS usage_event_default
+	// Created before any weekly partition so a write arriving mid-migration has
+	// somewhere to land. Caveat: once it holds rows for week W, creating W's
+	// partition fails, and recovery is a manual DETACH and re-insert.
+	`CREATE TABLE IF NOT EXISTS usage_event_default
      PARTITION OF usage_event DEFAULT`,
 
-  `CREATE UNIQUE INDEX IF NOT EXISTS usage_event_lookup
+	`CREATE UNIQUE INDEX IF NOT EXISTS usage_event_lookup
      ON usage_event ("subscriptionId", "usageTimestamp", "deduplicationId")`,
 
-  // Bounds are spelled with an explicit +00 offset. A bare date literal would
-  // be cast to timestamptz using the server's TimeZone, which nothing here
-  // controls, and the partition would straddle the wrong seven days.
-  `CREATE OR REPLACE FUNCTION usage_event_add_week(week_start date)
+	// Bounds are spelled with an explicit +00 offset. A bare date literal would
+	// be cast to timestamptz using the server's TimeZone, which nothing here
+	// controls, and the partition would straddle the wrong seven days.
+	`CREATE OR REPLACE FUNCTION usage_event_add_week(week_start date)
    RETURNS void
    LANGUAGE plpgsql
    AS $fn$
@@ -79,8 +79,8 @@ const TABLE_STATEMENTS = [
    END;
    $fn$`,
 
-  // ISO weeks start Monday, matching `snapToWindow` in summary.ts.
-  `CREATE OR REPLACE FUNCTION usage_event_maintain(weeks_ahead integer DEFAULT ${WEEKS_AHEAD})
+	// ISO weeks start Monday, matching `snapToWindow` in summary.ts.
+	`CREATE OR REPLACE FUNCTION usage_event_maintain(weeks_ahead integer DEFAULT ${WEEKS_AHEAD})
    RETURNS void
    LANGUAGE plpgsql
    AS $fn$
@@ -93,10 +93,10 @@ const TABLE_STATEMENTS = [
    END;
    $fn$`,
 
-  // Runs on every migration too, so a fresh database has its partitions before
-  // pg_cron's first tick — and so an environment without pg_cron still works,
-  // one deployment at a time.
-  `SELECT usage_event_maintain(${WEEKS_AHEAD})`,
+	// Runs on every migration too, so a fresh database has its partitions before
+	// pg_cron's first tick — and so an environment without pg_cron still works,
+	// one deployment at a time.
+	`SELECT usage_event_maintain(${WEEKS_AHEAD})`,
 ];
 
 /**
@@ -104,8 +104,8 @@ const TABLE_STATEMENTS = [
  * job name, so re-running only rewrites the schedule.
  */
 const SCHEDULER_STATEMENTS = [
-  `CREATE EXTENSION IF NOT EXISTS pg_cron`,
-  `SELECT cron.schedule(
+	`CREATE EXTENSION IF NOT EXISTS pg_cron`,
+	`SELECT cron.schedule(
      '${CRON_JOB_NAME}',
      '${MAINTENANCE_SCHEDULE}',
      'SELECT usage_event_maintain(${WEEKS_AHEAD})'
@@ -115,9 +115,9 @@ const SCHEDULER_STATEMENTS = [
 type Queryable = Pick<Pool, "query">;
 
 async function run(db: Queryable, statements: string[]): Promise<void> {
-  for (const statement of statements) {
-    await db.query(statement);
-  }
+	for (const statement of statements) {
+		await db.query(statement);
+	}
 }
 
 /**
@@ -130,16 +130,16 @@ async function run(db: Queryable, statements: string[]): Promise<void> {
  * rather than breaking it, so it is worth a warning rather than a failure.
  */
 export async function applyUsageSchema(db: Queryable): Promise<void> {
-  await run(db, TABLE_STATEMENTS);
+	await run(db, TABLE_STATEMENTS);
 
-  try {
-    await run(db, SCHEDULER_STATEMENTS);
-  } catch (err) {
-    console.warn(
-      "[usage-schema] pg_cron unavailable — partitions will only be created " +
-        "by this migration. Add pg_cron to shared_preload_libraries and " +
-        "restart the server to schedule them.",
-      err,
-    );
-  }
+	try {
+		await run(db, SCHEDULER_STATEMENTS);
+	} catch (err) {
+		console.warn(
+			"[usage-schema] pg_cron unavailable — partitions will only be created " +
+				"by this migration. Add pg_cron to shared_preload_libraries and " +
+				"restart the server to schedule them.",
+			err,
+		);
+	}
 }

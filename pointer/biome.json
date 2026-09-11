@@ -10,11 +10,18 @@
 	},
 	"formatter": {
 		"enabled": true,
-		"includes": ["app/**", "config/**", "lib/**", "plugins/**", "workers/**"]
+		"includes": [
+			"app/**",
+			"config/**",
+			"lib/**",
+			"plugins/**",
+			"scripts/**",
+			"workers/**"
+		]
 	},
 	"linter": {
 		"enabled": true,
-		"includes": ["app/**", "lib/**", "plugins/**", "workers/**"],
+		"includes": ["app/**", "lib/**", "plugins/**", "scripts/**", "workers/**"],
 		"rules": {
 			"preset": "none",
 			"style": {

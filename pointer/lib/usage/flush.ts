@@ -21,19 +21,19 @@
 import { emit } from "@/lib/events/emit";
 
 import {
-  MAX_DELIVERIES,
-  ingestBatch,
-  splitExhausted,
-  splitExpired,
+	MAX_DELIVERIES,
+	ingestBatch,
+	splitExhausted,
+	splitExpired,
 } from "./ingest";
 import {
-  ackUsageEvents,
-  deadLetterUsageEvents,
-  ensureConsumerGroup,
-  readUsageBatch,
-  reclaimStale,
-  usageStreamDepth,
-  type UsageStreamEntry,
+	ackUsageEvents,
+	deadLetterUsageEvents,
+	ensureConsumerGroup,
+	readUsageBatch,
+	reclaimStale,
+	usageStreamDepth,
+	type UsageStreamEntry,
 } from "./stream";
 import { recordUsageBatch } from "./store";
 
@@ -45,20 +45,20 @@ import { recordUsageBatch } from "./store";
 const RECLAIM_IDLE_MS = 5 * 60 * 1_000;
 
 export type FlushResult = {
-  ingested: number;
-  retrying: number;
-  expired: number;
-  exhausted: number;
-  /** Entries still buffered after this pass. Non-zero means drain continues. */
-  depth: number;
+	ingested: number;
+	retrying: number;
+	expired: number;
+	exhausted: number;
+	/** Entries still buffered after this pass. Non-zero means drain continues. */
+	depth: number;
 };
 
 const EMPTY: FlushResult = {
-  ingested: 0,
-  retrying: 0,
-  expired: 0,
-  exhausted: 0,
-  depth: 0,
+	ingested: 0,
+	retrying: 0,
+	expired: 0,
+	exhausted: 0,
+	depth: 0,
 };
 
 /**
@@ -66,73 +66,73 @@ const EMPTY: FlushResult = {
  * task's work is finished before it ages out of the backdating window.
  */
 async function collect(consumer: string): Promise<UsageStreamEntry[]> {
-  const reclaimed = await reclaimStale(consumer, RECLAIM_IDLE_MS);
-  if (reclaimed.length) return reclaimed;
+	const reclaimed = await reclaimStale(consumer, RECLAIM_IDLE_MS);
+	if (reclaimed.length) return reclaimed;
 
-  return readUsageBatch(consumer);
+	return readUsageBatch(consumer);
 }
 
 export async function flushUsage(consumer: string): Promise<FlushResult> {
-  await ensureConsumerGroup();
+	await ensureConsumerGroup();
 
-  const collected = await collect(consumer);
-  if (!collected.length) return EMPTY;
+	const collected = await collect(consumer);
+	if (!collected.length) return EMPTY;
 
-  // Archived before the Chargebee splits, so history keeps the events Chargebee
-  // refuses on age. A failure here throws: nothing is acknowledged, no batch is
-  // ingested, and the next pass reclaims the whole lot. History is the read path
-  // now, so a silent gap would be visible to the subscriber.
-  await recordUsageBatch(collected.map((entry) => entry.event));
+	// Archived before the Chargebee splits, so history keeps the events Chargebee
+	// refuses on age. A failure here throws: nothing is acknowledged, no batch is
+	// ingested, and the next pass reclaims the whole lot. History is the read path
+	// now, so a silent gap would be visible to the subscriber.
+	await recordUsageBatch(collected.map((entry) => entry.event));
 
-  // Chargebee will never accept these, and retrying only wastes attempts.
-  const { fresh, expired } = splitExpired(collected);
-  await deadLetterUsageEvents(expired, "backdating_window_exceeded");
+	// Chargebee will never accept these, and retrying only wastes attempts.
+	const { fresh, expired } = splitExpired(collected);
+	await deadLetterUsageEvents(expired, "backdating_window_exceeded");
 
-  const { retryable, exhausted } = splitExhausted(fresh);
-  await deadLetterUsageEvents(exhausted, `exceeded_${MAX_DELIVERIES}_attempts`);
+	const { retryable, exhausted } = splitExhausted(fresh);
+	await deadLetterUsageEvents(exhausted, `exceeded_${MAX_DELIVERIES}_attempts`);
 
-  if (!retryable.length) {
-    return {
-      ...EMPTY,
-      expired: expired.length,
-      exhausted: exhausted.length,
-      depth: await usageStreamDepth(),
-    };
-  }
+	if (!retryable.length) {
+		return {
+			...EMPTY,
+			expired: expired.length,
+			exhausted: exhausted.length,
+			depth: await usageStreamDepth(),
+		};
+	}
 
-  const result = await ingestBatch(retryable);
+	const result = await ingestBatch(retryable);
 
-  // Only the accepted entries are settled. The rest stay in the pending list
-  // and are picked up by the next reclaim, with their delivery count raised.
-  await ackUsageEvents(result.ingested.map((entry) => entry.id));
+	// Only the accepted entries are settled. The rest stay in the pending list
+	// and are picked up by the next reclaim, with their delivery count raised.
+	await ackUsageEvents(result.ingested.map((entry) => entry.id));
 
-  const depth = await usageStreamDepth();
+	const depth = await usageStreamDepth();
 
-  if (result.ingested.length) {
-    await emit(
-      "app.usage_ingested",
-      {
-        batch_id: result.batchId,
-        event_count: result.ingested.length,
-        buffered: depth,
-      },
-      { source: "worker" },
-    );
-  }
+	if (result.ingested.length) {
+		await emit(
+			"app.usage_ingested",
+			{
+				batch_id: result.batchId,
+				event_count: result.ingested.length,
+				buffered: depth,
+			},
+			{ source: "worker" },
+		);
+	}
 
-  if (result.failed.length) {
-    await emit(
-      "app.usage_ingest_failed",
-      { batch_id: result.batchId, event_count: result.failed.length },
-      { source: "worker" },
-    );
-  }
+	if (result.failed.length) {
+		await emit(
+			"app.usage_ingest_failed",
+			{ batch_id: result.batchId, event_count: result.failed.length },
+			{ source: "worker" },
+		);
+	}
 
-  return {
-    ingested: result.ingested.length,
-    retrying: result.failed.length,
-    expired: expired.length,
-    exhausted: exhausted.length,
-    depth,
-  };
+	return {
+		ingested: result.ingested.length,
+		retrying: result.failed.length,
+		expired: expired.length,
+		exhausted: exhausted.length,
+		depth,
+	};
 }

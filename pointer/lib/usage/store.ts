@@ -25,41 +25,41 @@ const CREDITS_MILLI_PER_CREDIT = 1_000;
 
 /** Insert order. Kept adjacent to the value projection below so they cannot drift. */
 const COLUMNS = [
-  "deduplicationId",
-  "subscriptionId",
-  "usageTimestamp",
-  "model",
-  "inputTokens",
-  "outputTokens",
-  "creditsMilli",
-  "usageSource",
-  "planId",
+	"deduplicationId",
+	"subscriptionId",
+	"usageTimestamp",
+	"model",
+	"inputTokens",
+	"outputTokens",
+	"creditsMilli",
+	"usageSource",
+	"planId",
 ] as const;
 
 function valuesFor(event: BufferedUsageEvent): unknown[] {
-  const properties = event.properties;
-  return [
-    event.deduplicationId,
-    event.subscriptionId,
-    new Date(event.usageTimestamp),
-    properties.model,
-    properties.input_tokens,
-    properties.output_tokens,
-    Math.round(properties.credits_consumed * CREDITS_MILLI_PER_CREDIT),
-    properties.usage_source,
-    properties.plan_id,
-  ];
+	const properties = event.properties;
+	return [
+		event.deduplicationId,
+		event.subscriptionId,
+		new Date(event.usageTimestamp),
+		properties.model,
+		properties.input_tokens,
+		properties.output_tokens,
+		Math.round(properties.credits_consumed * CREDITS_MILLI_PER_CREDIT),
+		properties.usage_source,
+		properties.plan_id,
+	];
 }
 
 /** `($1, $2, ...), ($10, $11, ...)` — one tuple per event, one statement. */
 function placeholders(count: number): string {
-  const tuples: string[] = [];
-  for (let row = 0; row < count; row += 1) {
-    const start = row * COLUMNS.length;
-    const slots = COLUMNS.map((_, column) => `$${start + column + 1}`);
-    tuples.push(`(${slots.join(", ")})`);
-  }
-  return tuples.join(", ");
+	const tuples: string[] = [];
+	for (let row = 0; row < count; row += 1) {
+		const start = row * COLUMNS.length;
+		const slots = COLUMNS.map((_, column) => `$${start + column + 1}`);
+		tuples.push(`(${slots.join(", ")})`);
+	}
+	return tuples.join(", ");
 }
 
 /**
@@ -72,18 +72,18 @@ function placeholders(count: number): string {
  * difference.
  */
 export async function recordUsageBatch(
-  events: BufferedUsageEvent[],
+	events: BufferedUsageEvent[],
 ): Promise<void> {
-  if (!events.length) return;
+	if (!events.length) return;
 
-  const pool = await getPool();
-  await pool.query(
-    `INSERT INTO usage_event (${COLUMNS.map((name) => `"${name}"`).join(", ")})
+	const pool = await getPool();
+	await pool.query(
+		`INSERT INTO usage_event (${COLUMNS.map((name) => `"${name}"`).join(", ")})
           VALUES ${placeholders(events.length)}
      ON CONFLICT ("subscriptionId", "usageTimestamp", "deduplicationId")
      DO NOTHING`,
-    events.flatMap(valuesFor),
-  );
+		events.flatMap(valuesFor),
+	);
 }
 
 /**
@@ -92,28 +92,28 @@ export async function recordUsageBatch(
  * expressions ever reach the query.
  */
 const AGGREGATES: Record<UsageMetric, string> = {
-  input_tokens: `SUM("inputTokens")`,
-  output_tokens: `SUM("outputTokens")`,
-  credits_consumed: `SUM("creditsMilli")::numeric / ${CREDITS_MILLI_PER_CREDIT}`,
-  generations: "COUNT(*)",
+	input_tokens: `SUM("inputTokens")`,
+	output_tokens: `SUM("outputTokens")`,
+	credits_consumed: `SUM("creditsMilli")::numeric / ${CREDITS_MILLI_PER_CREDIT}`,
+	generations: "COUNT(*)",
 };
 
 export type UsageSeriesQuery = {
-  subscriptionId: string;
-  metric: UsageMetric;
-  window: UsageWindow;
-  /** Inclusive, already snapped to a UTC window boundary by the caller. */
-  from: Date;
-  /** Exclusive. */
-  to: Date;
-  /** Bucket ceiling. Ask for one more than you need to detect a trimmed range. */
-  limit: number;
+	subscriptionId: string;
+	metric: UsageMetric;
+	window: UsageWindow;
+	/** Inclusive, already snapped to a UTC window boundary by the caller. */
+	from: Date;
+	/** Exclusive. */
+	to: Date;
+	/** Bucket ceiling. Ask for one more than you need to detect a trimmed range. */
+	limit: number;
 };
 
 /** One occupied bucket. Empty spans are absent — `GROUP BY` cannot invent them. */
 export type UsageBucket = {
-  from: Date;
-  value: number;
+	from: Date;
+	value: number;
 };
 
 /**
@@ -125,11 +125,11 @@ export type UsageBucket = {
  * and `("subscriptionId", "usageTimestamp")` leads the only index.
  */
 export async function readUsageSeries(
-  query: UsageSeriesQuery,
+	query: UsageSeriesQuery,
 ): Promise<UsageBucket[]> {
-  const pool = await getPool();
-  const result = await pool.query<{ bucket: Date; value: string }>(
-    `SELECT date_trunc($1::text, "usageTimestamp", 'UTC') AS bucket,
+	const pool = await getPool();
+	const result = await pool.query<{ bucket: Date; value: string }>(
+		`SELECT date_trunc($1::text, "usageTimestamp", 'UTC') AS bucket,
             ${AGGREGATES[query.metric]} AS value
        FROM usage_event
       WHERE "subscriptionId" = $2
@@ -138,12 +138,12 @@ export async function readUsageSeries(
       GROUP BY bucket
       ORDER BY bucket
       LIMIT $5`,
-    [query.window, query.subscriptionId, query.from, query.to, query.limit],
-  );
+		[query.window, query.subscriptionId, query.from, query.to, query.limit],
+	);
 
-  // SUM and COUNT come back as strings: both widen to bigint or numeric.
-  return result.rows.map((row) => ({
-    from: row.bucket,
-    value: Number(row.value),
-  }));
+	// SUM and COUNT come back as strings: both widen to bigint or numeric.
+	return result.rows.map((row) => ({
+		from: row.bucket,
+		value: Number(row.value),
+	}));
 }

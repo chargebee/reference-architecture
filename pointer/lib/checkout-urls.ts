@@ -9,12 +9,12 @@
  * Browser-only: `window` is unavailable during server rendering.
  */
 export function checkoutReturnUrls(cancelPath: string): {
-  successUrl: string;
-  cancelUrl: string;
+	successUrl: string;
+	cancelUrl: string;
 } {
-  const { origin } = window.location;
-  return {
-    successUrl: `${origin}/api/entitlements/checkout-complete?callbackURL=%2F`,
-    cancelUrl: `${origin}${cancelPath}`,
-  };
+	const { origin } = window.location;
+	return {
+		successUrl: `${origin}/api/entitlements/checkout-complete?callbackURL=%2F`,
+		cancelUrl: `${origin}${cancelPath}`,
+	};
 }

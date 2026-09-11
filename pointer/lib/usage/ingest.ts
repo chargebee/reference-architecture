@@ -24,8 +24,8 @@ export const MAX_EVENT_AGE_MS = BACKDATING_WINDOW_MS - EXPIRY_MARGIN_MS;
 export const MAX_DELIVERIES = 5;
 
 export type ExpirySplit = {
-  fresh: UsageStreamEntry[];
-  expired: UsageStreamEntry[];
+	fresh: UsageStreamEntry[];
+	expired: UsageStreamEntry[];
 };
 
 /**
@@ -33,33 +33,33 @@ export type ExpirySplit = {
  * pointless — the window only ever moves further away from them.
  */
 export function splitExpired(
-  entries: UsageStreamEntry[],
-  now = Date.now(),
+	entries: UsageStreamEntry[],
+	now = Date.now(),
 ): ExpirySplit {
-  const fresh: UsageStreamEntry[] = [];
-  const expired: UsageStreamEntry[] = [];
+	const fresh: UsageStreamEntry[] = [];
+	const expired: UsageStreamEntry[] = [];
 
-  for (const entry of entries) {
-    const age = now - entry.event.usageTimestamp;
-    if (age > MAX_EVENT_AGE_MS) {
-      expired.push(entry);
-      continue;
-    }
-    fresh.push(entry);
-  }
+	for (const entry of entries) {
+		const age = now - entry.event.usageTimestamp;
+		if (age > MAX_EVENT_AGE_MS) {
+			expired.push(entry);
+			continue;
+		}
+		fresh.push(entry);
+	}
 
-  return { fresh, expired };
+	return { fresh, expired };
 }
 
 /** Splits off entries that have failed too often to be worth another attempt. */
 export function splitExhausted(entries: UsageStreamEntry[]): {
-  retryable: UsageStreamEntry[];
-  exhausted: UsageStreamEntry[];
+	retryable: UsageStreamEntry[];
+	exhausted: UsageStreamEntry[];
 } {
-  return {
-    retryable: entries.filter((entry) => entry.deliveries <= MAX_DELIVERIES),
-    exhausted: entries.filter((entry) => entry.deliveries > MAX_DELIVERIES),
-  };
+	return {
+		retryable: entries.filter((entry) => entry.deliveries <= MAX_DELIVERIES),
+		exhausted: entries.filter((entry) => entry.deliveries > MAX_DELIVERIES),
+	};
 }
 
 /**
@@ -68,24 +68,24 @@ export function splitExhausted(entries: UsageStreamEntry[]): {
  * event, so both are probed.
  */
 function failedDeduplicationIds(failed: unknown): Set<string> {
-  const ids = new Set<string>();
-  if (!Array.isArray(failed)) return ids;
+	const ids = new Set<string>();
+	if (!Array.isArray(failed)) return ids;
 
-  for (const item of failed) {
-    if (!item || typeof item !== "object") continue;
-    const record = item as Record<string, unknown>;
-    const nested = record.usage_event as Record<string, unknown> | undefined;
-    const id = record.deduplication_id ?? nested?.deduplication_id;
-    if (typeof id === "string") ids.add(id);
-  }
+	for (const item of failed) {
+		if (!item || typeof item !== "object") continue;
+		const record = item as Record<string, unknown>;
+		const nested = record.usage_event as Record<string, unknown> | undefined;
+		const id = record.deduplication_id ?? nested?.deduplication_id;
+		if (typeof id === "string") ids.add(id);
+	}
 
-  return ids;
+	return ids;
 }
 
 export type IngestResult = {
-  batchId: string | null;
-  ingested: UsageStreamEntry[];
-  failed: UsageStreamEntry[];
+	batchId: string | null;
+	ingested: UsageStreamEntry[];
+	failed: UsageStreamEntry[];
 };
 
 /**
@@ -95,42 +95,42 @@ export type IngestResult = {
  * deduplicates on (deduplication_id, subscription_id, usage_timestamp).
  */
 export async function ingestBatch(
-  entries: UsageStreamEntry[],
+	entries: UsageStreamEntry[],
 ): Promise<IngestResult> {
-  if (!entries.length) {
-    return { batchId: null, ingested: [], failed: [] };
-  }
+	if (!entries.length) {
+		return { batchId: null, ingested: [], failed: [] };
+	}
 
-  const response = await chargebeeClient.usageEvent.batchIngest({
-    events: entries.map((entry) => ({
-      deduplication_id: entry.event.deduplicationId,
-      subscription_id: entry.event.subscriptionId,
-      usage_timestamp: entry.event.usageTimestamp,
-      properties: entry.event.properties,
-    })),
-  });
+	const response = await chargebeeClient.usageEvent.batchIngest({
+		events: entries.map((entry) => ({
+			deduplication_id: entry.event.deduplicationId,
+			subscription_id: entry.event.subscriptionId,
+			usage_timestamp: entry.event.usageTimestamp,
+			properties: entry.event.properties,
+		})),
+	});
 
-  const failedIds = failedDeduplicationIds(response.failed_events);
-  const unidentified =
-    Array.isArray(response.failed_events) &&
-    response.failed_events.length > 0 &&
-    failedIds.size === 0;
+	const failedIds = failedDeduplicationIds(response.failed_events);
+	const unidentified =
+		Array.isArray(response.failed_events) &&
+		response.failed_events.length > 0 &&
+		failedIds.size === 0;
 
-  if (unidentified) {
-    console.error(
-      "[usage-ingest] Chargebee reported unidentified failures",
-      response.failed_events,
-    );
-    return { batchId: response.batch_id, ingested: [], failed: entries };
-  }
+	if (unidentified) {
+		console.error(
+			"[usage-ingest] Chargebee reported unidentified failures",
+			response.failed_events,
+		);
+		return { batchId: response.batch_id, ingested: [], failed: entries };
+	}
 
-  return {
-    batchId: response.batch_id,
-    ingested: entries.filter(
-      (entry) => !failedIds.has(entry.event.deduplicationId),
-    ),
-    failed: entries.filter((entry) =>
-      failedIds.has(entry.event.deduplicationId),
-    ),
-  };
+	return {
+		batchId: response.batch_id,
+		ingested: entries.filter(
+			(entry) => !failedIds.has(entry.event.deduplicationId),
+		),
+		failed: entries.filter((entry) =>
+			failedIds.has(entry.event.deduplicationId),
+		),
+	};
 }

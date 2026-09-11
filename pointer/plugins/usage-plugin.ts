@@ -17,27 +17,27 @@ import type { BetterAuthPlugin } from "better-auth";
  * `CREATE INDEX` and fail. The DDL owns the index.
  */
 export const usagePlugin = {
-  id: "usage-archive",
-  schema: {
-    usageEvent: {
-      modelName: "usage_event",
-      fields: {
-        // Chargebee's `deduplication_id` — the generation's uuidv7 trace id.
-        // Doubles as the event's identity here, so no separate `id` column.
-        deduplicationId: { type: "string", required: true },
-        subscriptionId: { type: "string", required: true },
-        // Partition key. When the usage happened, not when it was flushed.
-        usageTimestamp: { type: "date", required: true },
-        model: { type: "string", required: true },
-        inputTokens: { type: "number", required: true },
-        outputTokens: { type: "number", required: true },
-        // Credits x 1000. `consumeGenerationUsage` divides milli-credits by
-        // 1000, so the value is fractional and an integer column would
-        // truncate it; Better Auth has no decimal type to declare instead.
-        creditsMilli: { type: "number", required: true },
-        usageSource: { type: "string", required: true },
-        planId: { type: "string", required: true },
-      },
-    },
-  },
+	id: "usage-archive",
+	schema: {
+		usageEvent: {
+			modelName: "usage_event",
+			fields: {
+				// Chargebee's `deduplication_id` — the generation's uuidv7 trace id.
+				// Doubles as the event's identity here, so no separate `id` column.
+				deduplicationId: { type: "string", required: true },
+				subscriptionId: { type: "string", required: true },
+				// Partition key. When the usage happened, not when it was flushed.
+				usageTimestamp: { type: "date", required: true },
+				model: { type: "string", required: true },
+				inputTokens: { type: "number", required: true },
+				outputTokens: { type: "number", required: true },
+				// Credits x 1000. `consumeGenerationUsage` divides milli-credits by
+				// 1000, so the value is fractional and an integer column would
+				// truncate it; Better Auth has no decimal type to declare instead.
+				creditsMilli: { type: "number", required: true },
+				usageSource: { type: "string", required: true },
+				planId: { type: "string", required: true },
+			},
+		},
+	},
 } satisfies BetterAuthPlugin;

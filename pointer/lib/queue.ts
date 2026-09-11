@@ -1,19 +1,20 @@
 import { SQSClient } from "@aws-sdk/client-sqs";
+import process from "node:process";
 
 declare global {
-  // Cache the SQS client across HMR reloads so we don't leak sockets in dev.
-  var __sqsClient: SQSClient | undefined;
+	// Cache the SQS client across HMR reloads so we don't leak sockets in dev.
+	var __sqsClient: SQSClient | undefined;
 }
 
 export function getSqsClient(): SQSClient {
-  if (globalThis.__sqsClient) return globalThis.__sqsClient;
+	if (globalThis.__sqsClient) return globalThis.__sqsClient;
 
-  const client = new SQSClient();
+	const client = new SQSClient();
 
-  if (process.env.NODE_ENV !== "production") {
-    globalThis.__sqsClient = client;
-  }
-  return client;
+	if (process.env.NODE_ENV !== "production") {
+		globalThis.__sqsClient = client;
+	}
+	return client;
 }
 
 /**
@@ -22,15 +23,15 @@ export function getSqsClient(): SQSClient {
  * worker only needs one consumer loop and one DLQ.
  */
 export function getWebhookQueueUrl(): string {
-  const queueUrl = process.env.CHARGEBEE_WEBHOOK_SQS_QUEUE_URL;
-  if (!queueUrl) {
-    throw new Error(
-      "CHARGEBEE_WEBHOOK_SQS_QUEUE_URL environment variable is required",
-    );
-  }
-  return queueUrl;
+	const queueUrl = process.env.CHARGEBEE_WEBHOOK_SQS_QUEUE_URL;
+	if (!queueUrl) {
+		throw new Error(
+			"CHARGEBEE_WEBHOOK_SQS_QUEUE_URL environment variable is required",
+		);
+	}
+	return queueUrl;
 }
 
 export function isFifoQueue(queueUrl: string): boolean {
-  return queueUrl.endsWith(".fifo");
+	return queueUrl.endsWith(".fifo");
 }

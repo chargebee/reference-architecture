@@ -11,15 +11,15 @@ import { auth } from "@/lib/auth";
  * runs once for the whole segment rather than per page.
  */
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
-  const requestHeaders = await headers();
-  const session = await auth.api.getSession({ headers: requestHeaders });
-  if (!session) redirect("/sign-in?from=/admin");
-  if (!(await isAdminRequest(requestHeaders))) redirect("/");
+	const requestHeaders = await headers();
+	const session = await auth.api.getSession({ headers: requestHeaders });
+	if (!session) redirect("/sign-in?from=/admin");
+	if (!(await isAdminRequest(requestHeaders))) redirect("/");
 
-  return (
-    <div className="flex flex-1 flex-col bg-zinc-50 font-sans text-zinc-900 dark:bg-black dark:text-zinc-50">
-      <AppHeader active="/admin" />
-      {children}
-    </div>
-  );
+	return (
+		<div className="flex flex-1 flex-col bg-zinc-50 font-sans text-zinc-900 dark:bg-black dark:text-zinc-50">
+			<AppHeader active="/admin" />
+			{children}
+		</div>
+	);
 }

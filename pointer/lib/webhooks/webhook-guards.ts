@@ -17,7 +17,7 @@ import { RetryableWebhookError } from "@/lib/webhooks/webhook-errors";
 // Composite key stored in the unique `resourceKey` column of
 // chargebee_resource_version (Better Auth can't express a composite PK).
 function resourceKey(resourceType: string, resourceId: string): string {
-  return `${resourceType}:${resourceId}`;
+	return `${resourceType}:${resourceId}`;
 }
 
 /**
@@ -26,21 +26,21 @@ function resourceKey(resourceType: string, resourceId: string): string {
  * ordering key for out-of-order (and duplicate) delivery.
  */
 export interface VersionedResource {
-  resourceType: string; // content key, e.g. "customer" | "subscription"
-  resourceId: string;
-  resourceVersion: number;
+	resourceType: string; // content key, e.g. "customer" | "subscription"
+	resourceId: string;
+	resourceVersion: number;
 }
 
 function isVersioned(
-  value: unknown,
+	value: unknown,
 ): value is { id: string; resource_version: number } {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof (value as { id?: unknown }).id === "string" &&
-    typeof (value as { resource_version?: unknown }).resource_version ===
-      "number"
-  );
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		typeof (value as { id?: unknown }).id === "string" &&
+		typeof (value as { resource_version?: unknown }).resource_version ===
+			"number"
+	);
 }
 
 /**
@@ -49,46 +49,46 @@ function isVersioned(
  * (e.g. `credit_note`, `unbilled_charge`).
  */
 export function versionedResources(event: WebhookEvent): VersionedResource[] {
-  const content = (event.content ?? {}) as Record<string, unknown>;
-  const out: VersionedResource[] = [];
-  for (const [key, value] of Object.entries(content)) {
-    const candidates = Array.isArray(value) ? value : [value];
-    for (const candidate of candidates) {
-      if (isVersioned(candidate)) {
-        out.push({
-          resourceType: key,
-          resourceId: candidate.id,
-          resourceVersion: candidate.resource_version,
-        });
-      }
-    }
-  }
-  return out;
+	const content = (event.content ?? {}) as Record<string, unknown>;
+	const out: VersionedResource[] = [];
+	for (const [key, value] of Object.entries(content)) {
+		const candidates = Array.isArray(value) ? value : [value];
+		for (const candidate of candidates) {
+			if (isVersioned(candidate)) {
+				out.push({
+					resourceType: key,
+					resourceId: candidate.id,
+					resourceVersion: candidate.resource_version,
+				});
+			}
+		}
+	}
+	return out;
 }
 
 async function storedVersion(
-  resourceType: string,
-  resourceId: string,
+	resourceType: string,
+	resourceId: string,
 ): Promise<number | undefined> {
-  const pool = await getPool();
-  const { rows } = await pool.query<{ resourceVersion: string }>(
-    `SELECT "resourceVersion" FROM chargebee_resource_version
+	const pool = await getPool();
+	const { rows } = await pool.query<{ resourceVersion: string }>(
+		`SELECT "resourceVersion" FROM chargebee_resource_version
       WHERE "resourceKey" = $1`,
-    [resourceKey(resourceType, resourceId)],
-  );
-  const stored = rows[0]?.resourceVersion;
-  return stored === undefined ? undefined : Number(stored);
+		[resourceKey(resourceType, resourceId)],
+	);
+	const stored = rows[0]?.resourceVersion;
+	return stored === undefined ? undefined : Number(stored);
 }
 
 /** A resource is stale when we've already applied an equal-or-newer version. */
 export async function isStale(
-  resourceType: string,
-  resourceId: string,
-  incomingVersion: number,
+	resourceType: string,
+	resourceId: string,
+	incomingVersion: number,
 ): Promise<boolean> {
-  const stored = await storedVersion(resourceType, resourceId);
-  if (stored === undefined) return false;
-  return incomingVersion <= stored;
+	const stored = await storedVersion(resourceType, resourceId);
+	if (stored === undefined) return false;
+	return incomingVersion <= stored;
 }
 
 /**
@@ -98,14 +98,14 @@ export async function isStale(
  * no versioned resources return false (nothing to compare, process normally).
  */
 export async function isEventStale(event: WebhookEvent): Promise<boolean> {
-  const resources = versionedResources(event);
-  if (resources.length === 0) return false;
-  const results = await Promise.all(
-    resources.map((r) =>
-      isStale(r.resourceType, r.resourceId, r.resourceVersion),
-    ),
-  );
-  return results.every(Boolean);
+	const resources = versionedResources(event);
+	if (resources.length === 0) return false;
+	const results = await Promise.all(
+		resources.map((r) =>
+			isStale(r.resourceType, r.resourceId, r.resourceVersion),
+		),
+	);
+	return results.every(Boolean);
 }
 
 /**
@@ -114,14 +114,14 @@ export async function isEventStale(event: WebhookEvent): Promise<boolean> {
  * event can never roll it back.
  */
 export async function commitVersions(event: WebhookEvent): Promise<void> {
-  const resources = versionedResources(event);
-  if (resources.length === 0) return;
-  const pool = await getPool();
-  for (const r of resources) {
-    await pool.query(
-      // Better Auth's CLI creates an `id` text PK with no DB default (app-layer
-      // id generation), so we supply one; it's ignored on the conflict path.
-      `INSERT INTO chargebee_resource_version
+	const resources = versionedResources(event);
+	if (resources.length === 0) return;
+	const pool = await getPool();
+	for (const r of resources) {
+		await pool.query(
+			// Better Auth's CLI creates an `id` text PK with no DB default (app-layer
+			// id generation), so we supply one; it's ignored on the conflict path.
+			`INSERT INTO chargebee_resource_version
               ("id", "resourceKey", "resourceVersion")
             VALUES ($1, $2, $3)
        ON CONFLICT ("resourceKey")
@@ -129,39 +129,39 @@ export async function commitVersions(event: WebhookEvent): Promise<void> {
                      "updatedAt" = now()
              WHERE EXCLUDED."resourceVersion"
                    > chargebee_resource_version."resourceVersion"`,
-      [uuidv7(), resourceKey(r.resourceType, r.resourceId), r.resourceVersion],
-    );
-  }
+			[uuidv7(), resourceKey(r.resourceType, r.resourceId), r.resourceVersion],
+		);
+	}
 }
 
 async function customerExists(chargebeeCustomerId: string): Promise<boolean> {
-  const pool = await getPool();
-  const { rows } = await pool.query(
-    `SELECT 1 FROM "user"         WHERE "chargebeeCustomerId" = $1
+	const pool = await getPool();
+	const { rows } = await pool.query(
+		`SELECT 1 FROM "user"         WHERE "chargebeeCustomerId" = $1
       UNION ALL
      SELECT 1 FROM "organization" WHERE "chargebeeCustomerId" = $1
       LIMIT 1`,
-    [chargebeeCustomerId],
-  );
-  return rows.length > 0;
+		[chargebeeCustomerId],
+	);
+	return rows.length > 0;
 }
 
 async function subscriptionExists(
-  chargebeeSubscriptionId: string,
+	chargebeeSubscriptionId: string,
 ): Promise<boolean> {
-  const pool = await getPool();
-  const { rows } = await pool.query(
-    `SELECT 1 FROM subscription
+	const pool = await getPool();
+	const { rows } = await pool.query(
+		`SELECT 1 FROM subscription
       WHERE "chargebeeSubscriptionId" = $1 LIMIT 1`,
-    [chargebeeSubscriptionId],
-  );
-  return rows.length > 0;
+		[chargebeeSubscriptionId],
+	);
+	return rows.length > 0;
 }
 
 /** Parent ids referenced anywhere in an event's `content`. */
 interface DependencyRefs {
-  customerIds: Set<string>;
-  subscriptionIds: Set<string>;
+	customerIds: Set<string>;
+	subscriptionIds: Set<string>;
 }
 
 /**
@@ -173,46 +173,46 @@ interface DependencyRefs {
  * `credit_note.customer_id`, …).
  */
 function collectDependencyRefs(
-  content: Record<string, unknown>,
+	content: Record<string, unknown>,
 ): DependencyRefs {
-  const customerIds = new Set<string>();
-  const subscriptionIds = new Set<string>();
+	const customerIds = new Set<string>();
+	const subscriptionIds = new Set<string>();
 
-  for (const [key, value] of Object.entries(content)) {
-    const items = Array.isArray(value) ? value : [value];
-    for (const item of items) {
-      if (!item || typeof item !== "object") continue;
-      const rec = item as Record<string, unknown>;
+	for (const [key, value] of Object.entries(content)) {
+		const items = Array.isArray(value) ? value : [value];
+		for (const item of items) {
+			if (!item || typeof item !== "object") continue;
+			const rec = item as Record<string, unknown>;
 
-      // An embedded parent object references itself by `id`.
-      if (key === "customer" && typeof rec.id === "string") {
-        customerIds.add(rec.id);
-      }
-      if (key === "subscription" && typeof rec.id === "string") {
-        subscriptionIds.add(rec.id);
-      }
+			// An embedded parent object references itself by `id`.
+			if (key === "customer" && typeof rec.id === "string") {
+				customerIds.add(rec.id);
+			}
+			if (key === "subscription" && typeof rec.id === "string") {
+				subscriptionIds.add(rec.id);
+			}
 
-      // Any resource can carry a foreign key up to its parent(s).
-      if (typeof rec.customer_id === "string") customerIds.add(rec.customer_id);
-      if (typeof rec.subscription_id === "string") {
-        subscriptionIds.add(rec.subscription_id);
-      }
-    }
-  }
+			// Any resource can carry a foreign key up to its parent(s).
+			if (typeof rec.customer_id === "string") customerIds.add(rec.customer_id);
+			if (typeof rec.subscription_id === "string") {
+				subscriptionIds.add(rec.subscription_id);
+			}
+		}
+	}
 
-  return { customerIds, subscriptionIds };
+	return { customerIds, subscriptionIds };
 }
 
 /** Resource types the event itself owns (creates/updates) — never gated. */
 function eventSubjects(eventType: string | undefined): {
-  customer: boolean;
-  subscription: boolean;
+	customer: boolean;
+	subscription: boolean;
 } {
-  const type = eventType ?? "";
-  return {
-    customer: type.startsWith("customer_"),
-    subscription: type.startsWith("subscription_"),
-  };
+	const type = eventType ?? "";
+	return {
+		customer: type.startsWith("customer_"),
+		subscription: type.startsWith("subscription_"),
+	};
 }
 
 /**
@@ -247,37 +247,37 @@ function eventSubjects(eventType: string | undefined): {
  * would requeue those events needlessly.
  */
 export async function assertDependencies(event: WebhookEvent): Promise<void> {
-  const content = (event.content ?? {}) as Record<string, unknown>;
-  const subjects = eventSubjects(event.event_type);
-  const { customerIds, subscriptionIds } = collectDependencyRefs(content);
+	const content = (event.content ?? {}) as Record<string, unknown>;
+	const subjects = eventSubjects(event.event_type);
+	const { customerIds, subscriptionIds } = collectDependencyRefs(content);
 
-  if (!subjects.customer) {
-    for (const customerId of customerIds) {
-      if (!(await customerExists(customerId))) {
-        throw new RetryableWebhookError(
-          `customer ${customerId} not yet in DB for event ${event.id}`,
-        );
-      }
-    }
-  }
+	if (!subjects.customer) {
+		for (const customerId of customerIds) {
+			if (!(await customerExists(customerId))) {
+				throw new RetryableWebhookError(
+					`customer ${customerId} not yet in DB for event ${event.id}`,
+				);
+			}
+		}
+	}
 
-  if (!subjects.customer && !subjects.subscription) {
-    for (const subscriptionId of subscriptionIds) {
-      if (!(await subscriptionExists(subscriptionId))) {
-        throw new RetryableWebhookError(
-          `subscription ${subscriptionId} not yet in DB for event ${event.id}`,
-        );
-      }
-    }
-  }
+	if (!(subjects.customer || subjects.subscription)) {
+		for (const subscriptionId of subscriptionIds) {
+			if (!(await subscriptionExists(subscriptionId))) {
+				throw new RetryableWebhookError(
+					`subscription ${subscriptionId} not yet in DB for event ${event.id}`,
+				);
+			}
+		}
+	}
 }
 
 // Subscription-create events for which the plugin should have persisted a row.
 // Restricted to creation so we never false-retry deletions/cancellations,
 // where the expected post-state is absence rather than presence.
 const SUBSCRIPTION_CREATE_EVENTS = new Set<string>([
-  "subscription_created",
-  "subscription_created_with_backdating",
+	"subscription_created",
+	"subscription_created_with_backdating",
 ]);
 
 /**
@@ -287,22 +287,22 @@ const SUBSCRIPTION_CREATE_EVENTS = new Set<string>([
  * `RetryableWebhookError` so the message retries instead of being lost.
  */
 export async function assertProcessed(event: WebhookEvent): Promise<void> {
-  const eventType = event.event_type;
-  if (!eventType || !SUBSCRIPTION_CREATE_EVENTS.has(eventType)) return;
+	const eventType = event.event_type;
+	if (!(eventType && SUBSCRIPTION_CREATE_EVENTS.has(eventType))) return;
 
-  const content = (event.content ?? {}) as { subscription?: { id?: string } };
-  const subId = content.subscription?.id;
-  if (!subId) return;
+	const content = (event.content ?? {}) as { subscription?: { id?: string } };
+	const subId = content.subscription?.id;
+	if (!subId) return;
 
-  const pool = await getPool();
-  const { rows } = await pool.query(
-    `SELECT 1 FROM subscription
+	const pool = await getPool();
+	const { rows } = await pool.query(
+		`SELECT 1 FROM subscription
       WHERE "chargebeeSubscriptionId" = $1 LIMIT 1`,
-    [subId],
-  );
-  if (rows.length === 0) {
-    throw new RetryableWebhookError(
-      `subscription ${subId} not persisted after processing event ${event.id}`,
-    );
-  }
+		[subId],
+	);
+	if (rows.length === 0) {
+		throw new RetryableWebhookError(
+			`subscription ${subId} not persisted after processing event ${event.id}`,
+		);
+	}
 }

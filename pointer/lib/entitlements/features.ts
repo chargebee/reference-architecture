@@ -7,7 +7,7 @@ import { entitlements } from "./provider";
 import type { EntitlementSubject } from "./subject";
 
 function unlimitedToInfinity(value: number | "unlimited"): number {
-  return value === "unlimited" ? Number.POSITIVE_INFINITY : value;
+	return value === "unlimited" ? Number.POSITIVE_INFINITY : value;
 }
 
 const free = planLimits["plan-free"];
@@ -26,28 +26,28 @@ const free = planLimits["plan-free"];
  * is no global to register before the first lookup.
  */
 export const features = {
-  inputTokensDaily: entitlements.feature(
-    "f_input_tokens_daily",
-    unlimitedToInfinity(free.inputTokensDaily),
-  ),
-  outputTokensDaily: entitlements.feature(
-    "f_output_tokens_daily",
-    unlimitedToInfinity(free.outputTokensDaily),
-  ),
-  creditsMonthly: entitlements.feature(
-    "f_credits_monthly",
-    unlimitedToInfinity(free.creditsMonthly),
-  ),
-  apiRatePerMinute: entitlements.feature(
-    "f_api_rate_per_minute",
-    free.apiRatePerMinute,
-  ),
-  maxSeats: entitlements.feature(
-    "f_max_seats",
-    unlimitedToInfinity(free.maxSeats),
-  ),
-  sso: entitlements.feature("f_sso", free.sso),
-  models: entitlements.feature<ModelTier>("f_models", free.models),
+	inputTokensDaily: entitlements.feature(
+		"f_input_tokens_daily",
+		unlimitedToInfinity(free.inputTokensDaily),
+	),
+	outputTokensDaily: entitlements.feature(
+		"f_output_tokens_daily",
+		unlimitedToInfinity(free.outputTokensDaily),
+	),
+	creditsMonthly: entitlements.feature(
+		"f_credits_monthly",
+		unlimitedToInfinity(free.creditsMonthly),
+	),
+	apiRatePerMinute: entitlements.feature(
+		"f_api_rate_per_minute",
+		free.apiRatePerMinute,
+	),
+	maxSeats: entitlements.feature(
+		"f_max_seats",
+		unlimitedToInfinity(free.maxSeats),
+	),
+	sso: entitlements.feature("f_sso", free.sso),
+	models: entitlements.feature<ModelTier>("f_models", free.models),
 };
 
 type FeatureCatalog = typeof features;
@@ -57,31 +57,31 @@ type FeatureCatalog = typeof features;
  * cannot be added, removed, or retyped without the limits following.
  */
 export type EntitlementLimits = {
-  [K in keyof FeatureCatalog]: FeatureCatalog[K] extends Feature<infer T>
-    ? T
-    : never;
+	[K in keyof FeatureCatalog]: FeatureCatalog[K] extends Feature<infer T>
+		? T
+		: never;
 };
 
 /** Every shape a catalog feature can resolve to. */
 type LimitValue = EntitlementLimits[keyof EntitlementLimits];
 
 export type ResolvedEntitlements = {
-  limits: EntitlementLimits;
-  /**
-   * True while Chargebee entitlements are still loading for this subscription.
-   * The limits are then the free-tier floor rather than the subscriber's plan.
-   */
-  pending: boolean;
+	limits: EntitlementLimits;
+	/**
+	 * True while Chargebee entitlements are still loading for this subscription.
+	 * The limits are then the free-tier floor rather than the subscriber's plan.
+	 */
+	pending: boolean;
 };
 
 export class EntitlementEvaluationError extends Error {
-  constructor(
-    readonly featureId: string,
-    readonly errorCode: string,
-    message: string,
-  ) {
-    super(message);
-  }
+	constructor(
+		readonly featureId: string,
+		readonly errorCode: string,
+		message: string,
+	) {
+		super(message);
+	}
 }
 
 /**
@@ -90,14 +90,14 @@ export class EntitlementEvaluationError extends Error {
  * evaluation target — is a configuration fault and must not silently pass.
  */
 function read<T>(featureId: string, resolution: EntitlementResolution<T>) {
-  if (resolution.errorCode && resolution.errorCode !== "FLAG_NOT_FOUND") {
-    throw new EntitlementEvaluationError(
-      featureId,
-      resolution.errorCode,
-      resolution.errorMessage ?? `Unable to evaluate ${featureId}`,
-    );
-  }
-  return { value: resolution.value, pending: resolution.reason === "STALE" };
+	if (resolution.errorCode && resolution.errorCode !== "FLAG_NOT_FOUND") {
+		throw new EntitlementEvaluationError(
+			featureId,
+			resolution.errorCode,
+			resolution.errorMessage ?? `Unable to evaluate ${featureId}`,
+		);
+	}
+	return { value: resolution.value, pending: resolution.reason === "STALE" };
 }
 
 /**
@@ -106,30 +106,30 @@ function read<T>(featureId: string, resolution: EntitlementResolution<T>) {
  * request.
  */
 export async function resolveEntitlements(
-  subject: EntitlementSubject,
+	subject: EntitlementSubject,
 ): Promise<ResolvedEntitlements> {
-  const target = { subscriptionId: subject.chargebeeSubscriptionId };
-  const limits: Record<string, LimitValue> = {};
-  let pending = false;
+	const target = { subscriptionId: subject.chargebeeSubscriptionId };
+	const limits: Record<string, LimitValue> = {};
+	let pending = false;
 
-  for (const [name, feature] of Object.entries(features)) {
-    const resolved = read<LimitValue>(
-      feature.featureId,
-      await feature.getDetails(target),
-    );
-    limits[name] = resolved.value;
-    pending ||= resolved.pending;
-  }
+	for (const [name, feature] of Object.entries(features)) {
+		const resolved = read<LimitValue>(
+			feature.featureId,
+			await feature.getDetails(target),
+		);
+		limits[name] = resolved.value;
+		pending ||= resolved.pending;
+	}
 
-  // `Feature<ModelTier>` asserts the type; Chargebee can still return a tier
-  // this build has never heard of, and that must not reach the model gate.
-  if (!isModelTier(String(limits.models))) {
-    throw new EntitlementEvaluationError(
-      features.models.featureId,
-      "PARSE_ERROR",
-      `Unknown model entitlement tier: ${String(limits.models)}`,
-    );
-  }
+	// `Feature<ModelTier>` asserts the type; Chargebee can still return a tier
+	// this build has never heard of, and that must not reach the model gate.
+	if (!isModelTier(String(limits.models))) {
+		throw new EntitlementEvaluationError(
+			features.models.featureId,
+			"PARSE_ERROR",
+			`Unknown model entitlement tier: ${String(limits.models)}`,
+		);
+	}
 
-  return { limits: limits as EntitlementLimits, pending };
+	return { limits: limits as EntitlementLimits, pending };
 }

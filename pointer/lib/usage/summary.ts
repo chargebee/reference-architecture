@@ -33,7 +33,7 @@ const WINDOWS: UsageWindow[] = ["hour", "day", "week", "month"];
 const MAX_WINDOWS = 1_000;
 
 export function isUsageWindow(value: string): value is UsageWindow {
-  return (WINDOWS as string[]).includes(value);
+	return (WINDOWS as string[]).includes(value);
 }
 
 /**
@@ -41,130 +41,130 @@ export function isUsageWindow(value: string): value is UsageWindow {
  * Monday, matching ISO-8601 and the weekly partition boundaries.
  */
 export function snapToWindow(date: Date, window: UsageWindow): Date {
-  const year = date.getUTCFullYear();
-  const month = date.getUTCMonth();
-  const day = date.getUTCDate();
+	const year = date.getUTCFullYear();
+	const month = date.getUTCMonth();
+	const day = date.getUTCDate();
 
-  if (window === "hour") {
-    return new Date(Date.UTC(year, month, day, date.getUTCHours()));
-  }
-  if (window === "day") {
-    return new Date(Date.UTC(year, month, day));
-  }
-  if (window === "week") {
-    // getUTCDay() is 0 for Sunday; rotate so Monday is 0.
-    const offset = (date.getUTCDay() + 6) % 7;
-    return new Date(Date.UTC(year, month, day - offset));
-  }
-  return new Date(Date.UTC(year, month, 1));
+	if (window === "hour") {
+		return new Date(Date.UTC(year, month, day, date.getUTCHours()));
+	}
+	if (window === "day") {
+		return new Date(Date.UTC(year, month, day));
+	}
+	if (window === "week") {
+		// getUTCDay() is 0 for Sunday; rotate so Monday is 0.
+		const offset = (date.getUTCDay() + 6) % 7;
+		return new Date(Date.UTC(year, month, day - offset));
+	}
+	return new Date(Date.UTC(year, month, 1));
 }
 
 /** Start of the window after `date`. `date` is assumed already snapped. */
 function nextWindow(date: Date, window: UsageWindow): Date {
-  const year = date.getUTCFullYear();
-  const month = date.getUTCMonth();
-  const day = date.getUTCDate();
+	const year = date.getUTCFullYear();
+	const month = date.getUTCMonth();
+	const day = date.getUTCDate();
 
-  if (window === "hour") {
-    return new Date(Date.UTC(year, month, day, date.getUTCHours() + 1));
-  }
-  if (window === "day") {
-    return new Date(Date.UTC(year, month, day + 1));
-  }
-  if (window === "week") {
-    return new Date(Date.UTC(year, month, day + 7));
-  }
-  return new Date(Date.UTC(year, month + 1, 1));
+	if (window === "hour") {
+		return new Date(Date.UTC(year, month, day, date.getUTCHours() + 1));
+	}
+	if (window === "day") {
+		return new Date(Date.UTC(year, month, day + 1));
+	}
+	if (window === "week") {
+		return new Date(Date.UTC(year, month, day + 7));
+	}
+	return new Date(Date.UTC(year, month + 1, 1));
 }
 
 export type UsageSummaryPoint = {
-  /** Inclusive start of the bucket. */
-  from: string;
-  /** Exclusive end of the bucket. */
-  to: string;
-  value: number;
+	/** Inclusive start of the bucket. */
+	from: string;
+	/** Exclusive end of the bucket. */
+	to: string;
+	value: number;
 };
 
 export type UsageSummarySeries = {
-  metric: UsageMetric;
-  featureId: string;
-  unit: string;
-  window: UsageWindow;
-  from: string;
-  to: string;
-  points: UsageSummaryPoint[];
-  /** True when the range held more buckets than one response may carry. */
-  truncated: boolean;
+	metric: UsageMetric;
+	featureId: string;
+	unit: string;
+	window: UsageWindow;
+	from: string;
+	to: string;
+	points: UsageSummaryPoint[];
+	/** True when the range held more buckets than one response may carry. */
+	truncated: boolean;
 };
 
 export type UsageSummaryQuery = {
-  subscriptionId: string;
-  metric: UsageMetric;
-  window: UsageWindow;
-  from: Date;
-  to: Date;
+	subscriptionId: string;
+	metric: UsageMetric;
+	window: UsageWindow;
+	from: Date;
+	to: Date;
 };
 
 /** Walks the range one window at a time, reading zero where nothing was recorded. */
 function fillBuckets(
-  buckets: UsageBucket[],
-  window: UsageWindow,
-  from: Date,
-  to: Date,
+	buckets: UsageBucket[],
+	window: UsageWindow,
+	from: Date,
+	to: Date,
 ): { points: UsageSummaryPoint[]; truncated: boolean } {
-  const recorded = new Map(
-    buckets.map((bucket) => [bucket.from.getTime(), bucket.value]),
-  );
+	const recorded = new Map(
+		buckets.map((bucket) => [bucket.from.getTime(), bucket.value]),
+	);
 
-  const points: UsageSummaryPoint[] = [];
-  let start = from;
+	const points: UsageSummaryPoint[] = [];
+	let start = from;
 
-  while (start < to) {
-    if (points.length >= MAX_WINDOWS) return { points, truncated: true };
+	while (start < to) {
+		if (points.length >= MAX_WINDOWS) return { points, truncated: true };
 
-    const end = nextWindow(start, window);
-    points.push({
-      from: start.toISOString(),
-      to: end.toISOString(),
-      value: recorded.get(start.getTime()) ?? 0,
-    });
-    start = end;
-  }
+		const end = nextWindow(start, window);
+		points.push({
+			from: start.toISOString(),
+			to: end.toISOString(),
+			value: recorded.get(start.getTime()) ?? 0,
+		});
+		start = end;
+	}
 
-  return { points, truncated: false };
+	return { points, truncated: false };
 }
 
 export async function fetchUsageSummary(
-  query: UsageSummaryQuery,
+	query: UsageSummaryQuery,
 ): Promise<UsageSummarySeries> {
-  const feature = meteredFeatureFor(query.metric);
-  const from = snapToWindow(query.from, query.window);
+	const feature = meteredFeatureFor(query.metric);
+	const from = snapToWindow(query.from, query.window);
 
-  const buckets = await readUsageSeries({
-    subscriptionId: query.subscriptionId,
-    metric: query.metric,
-    window: query.window,
-    from,
-    to: query.to,
-    // One past the cap: enough to know the range overflowed without paging it.
-    limit: MAX_WINDOWS + 1,
-  });
+	const buckets = await readUsageSeries({
+		subscriptionId: query.subscriptionId,
+		metric: query.metric,
+		window: query.window,
+		from,
+		to: query.to,
+		// One past the cap: enough to know the range overflowed without paging it.
+		limit: MAX_WINDOWS + 1,
+	});
 
-  const { points, truncated } = fillBuckets(
-    buckets,
-    query.window,
-    from,
-    query.to,
-  );
+	const { points, truncated } = fillBuckets(
+		buckets,
+		query.window,
+		from,
+		query.to,
+	);
 
-  return {
-    metric: query.metric,
-    featureId: feature.expectedId,
-    unit: feature.feature_unit,
-    window: query.window,
-    from: from.toISOString(),
-    to: query.to.toISOString(),
-    points,
-    truncated,
-  };
+	return {
+		metric: query.metric,
+		featureId: feature.expectedId,
+		unit: feature.feature_unit,
+		window: query.window,
+		from: from.toISOString(),
+		to: query.to.toISOString(),
+		points,
+		truncated,
+	};
 }

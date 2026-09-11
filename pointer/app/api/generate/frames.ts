@@ -3,14 +3,14 @@ import type { UsageSnapshot } from "@/lib/entitlements/gate";
 export const NDJSON_CONTENT_TYPE = "application/x-ndjson; charset=utf-8";
 
 export type UpgradeHint = {
-  action: "upgrade" | "buy_credits";
-  href: "/choose-plan";
+	action: "upgrade" | "buy_credits";
+	href: "/choose-plan";
 };
 
 export function upgradeHint(
-  action: UpgradeHint["action"] = "upgrade",
+	action: UpgradeHint["action"] = "upgrade",
 ): UpgradeHint {
-  return { action, href: "/choose-plan" };
+	return { action, href: "/choose-plan" };
 }
 
 /**
@@ -19,29 +19,29 @@ export function upgradeHint(
  * as an `error` frame.
  */
 export type GenerateFrame =
-  | { type: "delta"; text: string }
-  | {
-      type: "done";
-      id: string;
-      model: string;
-      usage: {
-        inputTokens: number;
-        outputTokens: number;
-        creditsConsumed: number;
-        source: "plan_quota" | "credits";
-      };
-      limits: UsageSnapshot;
-    }
-  | {
-      type: "error";
-      error: string;
-      message: string;
-      featureId?: string;
-      upgradeHint?: UpgradeHint;
-      limits?: UsageSnapshot;
-    };
+	| { type: "delta"; text: string }
+	| {
+			type: "done";
+			id: string;
+			model: string;
+			usage: {
+				inputTokens: number;
+				outputTokens: number;
+				creditsConsumed: number;
+				source: "plan_quota" | "credits";
+			};
+			limits: UsageSnapshot;
+	  }
+	| {
+			type: "error";
+			error: string;
+			message: string;
+			featureId?: string;
+			upgradeHint?: UpgradeHint;
+			limits?: UsageSnapshot;
+	  };
 
 /** NDJSON: one frame per line, so a reader can parse without buffering it all. */
 export function encodeFrame(frame: GenerateFrame): string {
-  return `${JSON.stringify(frame)}\n`;
+	return `${JSON.stringify(frame)}\n`;
 }
