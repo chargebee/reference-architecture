@@ -1234,7 +1234,7 @@ Authorization: Bearer <ADMIN-TOKEN>`,
   <script>
     const es = new EventSource('/api/events/stream');
     es.onmessage = e => renderEvent(JSON.parse(e.data));
-  <\/script>
+  </script>
 </html>`,
         chips:["SSE setup"]
       },
