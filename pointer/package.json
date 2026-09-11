@@ -14,6 +14,7 @@
     "db:migrate:local": "tsx --env-file=.env.local scripts/migrate-usage.ts && npx --yes @better-auth/cli@latest migrate -y",
     "bootstrap:chargebee": "tsx --env-file=.env.local scripts/bootstrap-chargebee.ts",
     "worker:chargebee": "tsx --env-file=.env.local workers/chargebee-webhook-worker.ts",
+    "worker:chargebee:log": "mkdir -p logs && tsx --env-file=.env.local workers/chargebee-webhook-worker.ts 2>&1 | tee -a logs/worker.log",
     "reconcile:entitlements": "tsx --env-file=.env.local scripts/reconcile-entitlements.ts"
   },
   "dependencies": {

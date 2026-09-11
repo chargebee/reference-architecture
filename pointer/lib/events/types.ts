@@ -20,7 +20,9 @@ export type AppEventType =
   | "app.generate_completed"
   | "app.usage_threshold"
   | "app.usage_ingested"
-  | "app.usage_ingest_failed";
+  | "app.usage_ingest_failed"
+  | "chargebee.alert_triggered"
+  | "chargebee.alert_resolved";
 
 export interface AppEvent<TData = Record<string, unknown>> {
   event_id: string;

@@ -19,6 +19,7 @@ import {
   processEntitlementWebhook,
   runEntitlementSyncJob,
 } from "@/lib/entitlements/sync";
+import { processAlertWebhook } from "@/lib/alerts/sync";
 import { emit } from "@/lib/events/emit";
 import {
   PoisonWebhookError,
@@ -198,18 +199,26 @@ export function createChargebeeWebhookMessageProcessor({
         return;
       }
 
-      // 3. Dependency pre-check (throws RetryableWebhookError when not ready).
-      await assertDependencies(event);
+      // 3a. Handle alert status changes — processed before assertDependencies
+      //     because alert_status_changed events are global and do not require
+      //     the subscription to exist in the local DB mirror yet.
+      if (await processAlertWebhook(event)) {
+        // Alert events don't need the rest of the subscription pipeline.
+        // Fall through to commitVersions + webhook_processed below.
+      } else {
+        // 3b. Dependency pre-check (throws RetryableWebhookError when not ready).
+        await assertDependencies(event);
 
-      // 4. Process (plugin DB-sync hooks).
-      await (await processorPromise).process(event);
+        // 4. Process (plugin DB-sync hooks).
+        await (await processorPromise).process(event);
 
-      // 5. Verify the plugin's swallowed errors before an entitlement job can
-      // observe a subscription-created event as successfully mirrored.
-      await assertProcessed(event);
+        // 5. Verify the plugin's swallowed errors before an entitlement job can
+        // observe a subscription-created event as successfully mirrored.
+        await assertProcessed(event);
 
-      // 6. Refresh or queue the resolved entitlement mirror.
-      await processEntitlementWebhook(event);
+        // 6. Refresh or queue the resolved entitlement mirror.
+        await processEntitlementWebhook(event);
+      }
 
       // 7. Commit applied versions, emit, and let the runtime acknowledge.
       await commitVersions(event);
