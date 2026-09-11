@@ -418,65 +418,77 @@ export function meteredFeatureFor(metric: UsageMetric): MeteredFeatureSpec {
 }
 
 // ---------------------------------------------------------------------------
-// Plan limits — DRY shape consumed by the Better-Auth plugin subscription
-// block (src/lib/auth.ts) so the app can read `subscription.list()[i].limits`
-// without round-tripping to Chargebee for entitlement values.
+// Plan limits — the typed view of `itemEntitlements` above, consumed by the
+// Better-Auth plugin subscription block (src/lib/auth.ts) so the app can read
+// `subscription.list()[i].limits` without round-tripping to Chargebee.
+//
+// Derived, never declared: the entitlement values are the single source of
+// truth, so editing a limit in one place moves both Chargebee and the runtime.
 // ---------------------------------------------------------------------------
 
+export const UNLIMITED = "unlimited";
+
+const modelTiers = ["basic", "advanced", "premium", "enterprise"] as const;
+
+export type ModelTier = (typeof modelTiers)[number];
+
 export type PlanLimits = {
-	inputTokensDaily: number | "unlimited";
-	outputTokensDaily: number | "unlimited";
-	creditsMonthly: number | "unlimited";
+	inputTokensDaily: number | typeof UNLIMITED;
+	outputTokensDaily: number | typeof UNLIMITED;
+	creditsMonthly: number | typeof UNLIMITED;
 	apiRatePerMinute: number;
-	maxSeats: number | "unlimited";
+	maxSeats: number | typeof UNLIMITED;
 	sso: boolean;
-	models: "basic" | "advanced" | "premium" | "enterprise";
+	models: ModelTier;
 };
 
-export const planLimits: Record<PlanId, PlanLimits> = {
-	"plan-free": {
-		inputTokensDaily: 50_000,
-		outputTokensDaily: 10_000,
-		creditsMonthly: 0,
-		apiRatePerMinute: 30,
-		maxSeats: 1,
-		sso: false,
-		models: "basic",
-	},
-	"plan-pro": {
-		inputTokensDaily: 1_000_000,
-		outputTokensDaily: 200_000,
-		creditsMonthly: 500,
-		apiRatePerMinute: 300,
-		maxSeats: 1,
-		sso: false,
-		models: "advanced",
-	},
-	"plan-max": {
-		inputTokensDaily: 10_000_000,
-		outputTokensDaily: 2_000_000,
-		creditsMonthly: 5_000,
-		apiRatePerMinute: 1_000,
-		maxSeats: 1,
-		sso: false,
-		models: "premium",
-	},
-	"plan-team": {
-		inputTokensDaily: 5_000_000,
-		outputTokensDaily: 1_000_000,
-		creditsMonthly: 2_000,
-		apiRatePerMinute: 500,
-		maxSeats: 100,
-		sso: true,
-		models: "premium",
-	},
-	"plan-enterprise": {
-		inputTokensDaily: "unlimited",
-		outputTokensDaily: "unlimited",
-		creditsMonthly: "unlimited",
-		apiRatePerMinute: 5_000,
-		maxSeats: "unlimited",
-		sso: true,
-		models: "enterprise",
-	},
-};
+/** A `quantity` feature whose ladder tops out at `is_unlimited`. */
+function quantity(value: string): number | typeof UNLIMITED {
+	if (value === UNLIMITED) return UNLIMITED;
+	return count(value);
+}
+
+function count(value: string): number {
+	const parsed = Number(value);
+	if (!Number.isInteger(parsed)) {
+		throw new Error(`Entitlement value is not a whole number: ${value}`);
+	}
+	return parsed;
+}
+
+function modelTier(value: string): ModelTier {
+	const tier = modelTiers.find((entry) => entry === value);
+	if (!tier) {
+		throw new Error(`Entitlement value is not a model tier: ${value}`);
+	}
+	return tier;
+}
+
+function limitsFor(planId: PlanId): PlanLimits {
+	const valueOf = (featureId: string): string => {
+		const entitlement = itemEntitlements[planId].find(
+			(entry) => entry.feature_id === featureId,
+		);
+		if (!entitlement) {
+			throw new Error(`${planId} declares no entitlement for ${featureId}`);
+		}
+		return entitlement.value;
+	};
+
+	return {
+		inputTokensDaily: quantity(valueOf("f_input_tokens_daily")),
+		outputTokensDaily: quantity(valueOf("f_output_tokens_daily")),
+		creditsMonthly: quantity(valueOf("f_credits_monthly")),
+		apiRatePerMinute: count(valueOf("f_api_rate_per_minute")),
+		maxSeats: quantity(valueOf("f_max_seats")),
+		sso: valueOf("f_sso") === "true",
+		models: modelTier(valueOf("f_models")),
+	};
+}
+
+export const planLimits: Record<PlanId, PlanLimits> = Object.fromEntries(
+	(Object.keys(itemEntitlements) as PlanId[]).map((planId) => [
+		planId,
+		limitsFor(planId),
+	]),
+) as Record<PlanId, PlanLimits>;

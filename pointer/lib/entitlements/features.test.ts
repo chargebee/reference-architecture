@@ -1,6 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { EntitlementResolution } from "@chargebee/entitlements";
 
+import { planLimits } from "@/scripts/catalog";
+
 vi.mock("server-only", () => ({}));
 
 const mocks = vi.hoisted(() => ({
@@ -111,15 +113,9 @@ describe("entitlement catalog", () => {
 
 		const { limits, pending } = await resolveEntitlements(subject);
 
-		expect(limits).toEqual({
-			inputTokensDaily: 50_000,
-			outputTokensDaily: 10_000,
-			creditsMonthly: 0,
-			apiRatePerMinute: 30,
-			maxSeats: 1,
-			sso: false,
-			models: "basic",
-		});
+		// The floor is the catalog's free plan, so tuning its entitlements must
+		// not drag this expectation along.
+		expect(limits).toEqual(planLimits["plan-free"]);
 		expect(pending).toBe(false);
 	});
 
