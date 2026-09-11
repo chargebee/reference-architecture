@@ -44,6 +44,21 @@ output "migrate_task_family" {
 }
 
 output "worker_service_name" {
-  description = "ECS service running the Chargebee webhook worker (scale independently of the app)."
-  value       = aws_ecs_service.worker.name
+  description = "ECS service running the Chargebee webhook worker, or null when Lambda is selected."
+  value       = local.ecs_worker_enabled ? aws_ecs_service.worker[0].name : null
+}
+
+output "worker_lambda_function_name" {
+  description = "Lambda function running the Chargebee webhook worker, or null when ECS is selected."
+  value       = local.lambda_worker_enabled ? module.lambda_worker[0].function_name : null
+}
+
+output "worker_lambda_function_arn" {
+  description = "ARN of the Lambda webhook worker, or null when ECS is selected."
+  value       = local.lambda_worker_enabled ? module.lambda_worker[0].function_arn : null
+}
+
+output "worker_runtime" {
+  description = "Selected Chargebee webhook worker runtime."
+  value       = var.worker_runtime
 }

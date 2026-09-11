@@ -15,10 +15,10 @@
  * exceeded, auto-routes it to the DLQ.
  */
 export class RetryableWebhookError extends Error {
-  constructor(message: string, options?: ErrorOptions) {
-    super(message, options);
-    this.name = "RetryableWebhookError";
-  }
+	constructor(message: string, options?: ErrorOptions) {
+		super(message, options);
+		this.name = "RetryableWebhookError";
+	}
 }
 
 /**
@@ -27,8 +27,8 @@ export class RetryableWebhookError extends Error {
  * message instead of burning the retry budget.
  */
 export class PoisonWebhookError extends Error {
-  constructor(message: string, options?: ErrorOptions) {
-    super(message, options);
-    this.name = "PoisonWebhookError";
-  }
+	constructor(message: string, options?: ErrorOptions) {
+		super(message, options);
+		this.name = "PoisonWebhookError";
+	}
 }

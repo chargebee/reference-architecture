@@ -23,6 +23,7 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Protect /dashboard and any other authed area; everything else (including /api/auth/*) is public.
-  matcher: ["/dashboard/:path*", "/flow/:path*", "/choose-plan"],
+  // Protect /admin and any other authed area; everything else (including /api/auth/*) is public.
+  // `/` is deliberately absent: it serves the marketing page to signed-out visitors.
+  matcher: ["/admin/:path*", "/choose-plan", "/usage"],
 };

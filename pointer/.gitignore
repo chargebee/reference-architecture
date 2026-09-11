@@ -19,6 +19,12 @@
 
 # production
 /build
+/dist
+/vendor/*
+!/vendor/README.md
+
+# terraform local data
+**/.terraform*/
 
 # misc
 .DS_Store
@@ -39,3 +45,4 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+logs/

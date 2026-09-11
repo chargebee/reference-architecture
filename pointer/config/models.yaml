@@ -1,0 +1,13 @@
+# OpenRouter model slugs (https://openrouter.ai/api/v1/models). `*` grants any
+# slug; a `:*` suffix grants every variant of one model, e.g. `:batch`.
+basic:
+  - poolside/laguna-s-2.1:free
+advanced:
+  - poolside/laguna-s-2.1:free
+  - nvidia/nemotron-3.5-lightning:free
+premium:
+  - poolside/laguna-s-2.1:free
+  - nvidia/nemotron-3.5-lightning:free
+  - google/gemma-4-31b-it:free
+enterprise:
+  - "*"

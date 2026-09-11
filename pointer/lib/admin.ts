@@ -9,11 +9,11 @@ import { auth } from "@/lib/auth";
  * (`user:list`) so ordinary members resolve to `false`.
  */
 export async function isAdminRequest(
-  requestHeaders: Headers,
+	requestHeaders: Headers,
 ): Promise<boolean> {
-  const { success } = await auth.api.userHasPermission({
-    headers: requestHeaders,
-    body: { permissions: { user: ["list"] } },
-  });
-  return success;
+	const { success } = await auth.api.userHasPermission({
+		headers: requestHeaders,
+		body: { permissions: { user: ["list"] } },
+	});
+	return success;
 }

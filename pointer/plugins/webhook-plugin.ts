@@ -13,22 +13,22 @@ import type { BetterAuthPlugin } from "better-auth";
  * upserts off the unique `resourceKey` ("<resourceType>:<resourceId>").
  */
 export const webhookCorrectnessPlugin = {
-  id: "webhook-correctness",
-  schema: {
-    chargebeeResourceVersion: {
-      modelName: "chargebee_resource_version",
-      fields: {
-        // "<resourceType>:<resourceId>", e.g. "customer:cbdemo_alex".
-        resourceKey: { type: "string", required: true, unique: true },
-        // Chargebee resource_version is a large monotonic value (ms-based),
-        // so it must be a bigint to avoid int32 overflow.
-        resourceVersion: { type: "number", required: true, bigint: true },
-        updatedAt: {
-          type: "date",
-          required: true,
-          defaultValue: () => new Date(),
-        },
-      },
-    },
-  },
+	id: "webhook-correctness",
+	schema: {
+		chargebeeResourceVersion: {
+			modelName: "chargebee_resource_version",
+			fields: {
+				// "<resourceType>:<resourceId>", e.g. "customer:cbdemo_alex".
+				resourceKey: { type: "string", required: true, unique: true },
+				// Chargebee resource_version is a large monotonic value (ms-based),
+				// so it must be a bigint to avoid int32 overflow.
+				resourceVersion: { type: "number", required: true, bigint: true },
+				updatedAt: {
+					type: "date",
+					required: true,
+					defaultValue: () => new Date(),
+				},
+			},
+		},
+	},
 } satisfies BetterAuthPlugin;

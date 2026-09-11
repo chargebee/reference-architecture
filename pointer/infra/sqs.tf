@@ -12,9 +12,11 @@ resource "aws_sqs_queue" "main" {
   # increasing backoff until its prerequisite lands. Realistic out-of-order
   # gaps are seconds, so 4 days is ample headroom while maxReceiveCount caps
   # per-message retries before the DLQ.
-  message_retention_seconds  = 345600
-  sqs_managed_sse_enabled    = true
-  visibility_timeout_seconds = 30
+  message_retention_seconds = 345600
+  sqs_managed_sse_enabled   = true
+  # Lambda requires at least 6x its function timeout so throttled batches have
+  # enough time to retry. ECS overrides visibility per receive and heartbeats.
+  visibility_timeout_seconds = local.worker_queue_visibility_timeout_seconds
 
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.dlq.arn

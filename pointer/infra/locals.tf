@@ -6,15 +6,30 @@ locals {
   az_count       = 2
   azs            = slice(data.aws_availability_zones.available.names, 0, local.az_count)
 
-  # Shared env + secrets injected into every pointer container (app + migrate).
+  # Named here rather than read off the instance: the parameter group needs it
+  # for cron.database_name, and depending on the instance would be a cycle.
+  db_name = "pointer"
+
+  ecs_worker_enabled    = var.worker_runtime == "ecs"
+  lambda_worker_enabled = var.worker_runtime == "lambda"
+  worker_queue_visibility_timeout_seconds = local.lambda_worker_enabled ? (
+    var.worker_lambda_timeout_seconds * 6
+  ) : 30
+
+  # Shared env + secrets injected into every pointer container (app + migrate +
+  # the ECS worker when selected).
   container_env = [
     { name = "NODE_ENV", value = "production" },
     { name = "AWS_REGION", value = var.region },
     { name = "CHARGEBEE_WEBHOOK_SQS_QUEUE_URL", value = aws_sqs_queue.main.url },
     { name = "CHARGEBEE_WEBHOOK_DLQ_URL", value = aws_sqs_queue.dlq.url },
     { name = "REDIS_URL", value = "redis://${aws_elasticache_cluster.app.cache_nodes[0].address}:${aws_elasticache_cluster.app.cache_nodes[0].port}" },
+    { name = "ENTITLEMENTS_CACHE_TTL_SECONDS", value = "300" },
+    { name = "ENTITLEMENTS_SNAPSHOT_TTL_SECONDS", value = "86400" },
     { name = "BETTER_AUTH_URL", value = "https://${local.domain}" },
     { name = "BETTER_AUTH_TRUSTED_ORIGINS", value = "https://${local.domain}" },
+    { name = "CHARGEBEE_USAGE_INGEST_ENABLED", value = tostring(var.usage_ingest_enabled) },
+    { name = "USAGE_FLUSH_INTERVAL_MS", value = tostring(var.usage_flush_interval_ms) },
   ]
 
   container_secrets = [
@@ -43,8 +58,25 @@ locals {
       valueFrom = "${aws_secretsmanager_secret.app.arn}:chargebee_webhook_password::"
     },
     {
+      name      = "OPENROUTER_API_KEY"
+      valueFrom = "${aws_secretsmanager_secret.app.arn}:openrouter_api_key::"
+    },
+    {
       name      = "ADMIN_USER_IDS"
       valueFrom = "${aws_secretsmanager_secret.app.arn}:admin_user_ids::"
     }
   ]
+
+  # Lambda reserves AWS_REGION and loads secret values at cold start so secret
+  # material never enters Terraform state or the Lambda environment config.
+  lambda_worker_env = merge(
+    {
+      for item in local.container_env : item.name => item.value
+      if item.name != "AWS_REGION"
+    },
+    {
+      DATABASE_SECRET_ARN = aws_secretsmanager_secret.db.arn
+      APP_SECRET_ARN      = aws_secretsmanager_secret.app.arn
+    },
+  )
 }

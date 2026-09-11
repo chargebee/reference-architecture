@@ -31,6 +31,17 @@ resource "aws_vpc_security_group_ingress_rule" "db_from_ecs" {
   ip_protocol                  = "tcp"
 }
 
+resource "aws_vpc_security_group_ingress_rule" "db_from_lambda_worker" {
+  count = local.lambda_worker_enabled ? 1 : 0
+
+  security_group_id            = aws_security_group.db.id
+  description                  = "Postgres from Lambda webhook worker"
+  referenced_security_group_id = aws_security_group.lambda_worker[0].id
+  from_port                    = 5432
+  to_port                      = 5432
+  ip_protocol                  = "tcp"
+}
+
 resource "aws_db_parameter_group" "app" {
   name        = "${local.name_prefix}-db-pg"
   family      = "postgres${split(".", data.aws_rds_engine_version.postgres.version)[0]}"
@@ -39,6 +50,24 @@ resource "aws_db_parameter_group" "app" {
   parameter {
     name  = "rds.force_ssl"
     value = "1"
+  }
+
+  # pg_cron creates the weekly `usage_event` partitions. It is loaded at server
+  # start, so this is a static parameter: Terraform stages it, and the instance
+  # must be rebooted before `CREATE EXTENSION pg_cron` will succeed. See the
+  # "Database migrations" section of infra/README.md.
+  parameter {
+    name         = "shared_preload_libraries"
+    value        = "pg_cron"
+    apply_method = "pending-reboot"
+  }
+
+  # pg_cron keeps its metadata in exactly one database and defaults to
+  # `postgres`. Jobs scheduled from the app database would never be read.
+  parameter {
+    name         = "cron.database_name"
+    value        = local.db_name
+    apply_method = "pending-reboot"
   }
 }
 
@@ -78,7 +107,7 @@ resource "aws_db_instance" "app" {
   storage_type          = "gp3"
   storage_encrypted     = true
 
-  db_name  = "pointer"
+  db_name  = local.db_name
   username = "pointer"
   password = random_password.db_master.result
 
