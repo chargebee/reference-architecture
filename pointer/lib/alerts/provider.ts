@@ -123,7 +123,7 @@ export async function listActiveAlarmsForSubscription(
 	// Build a set of alert_ids Chargebee explicitly marks as "ok".
 	// These override any stale Redis entry — evict them from Redis asynchronously.
 	const cbOkAlertIds = new Set(
-		allCbStatuses.filter((s) => s.alarm_status === "ok").map((s) => s.alert_id),
+		allCbStatuses.filter((s) => s.alarm_status === "in_alarm").map((s) => s.alert_id),
 	);
 	for (const la of localAlarms) {
 		if (cbOkAlertIds.has(la.alert_id)) {
