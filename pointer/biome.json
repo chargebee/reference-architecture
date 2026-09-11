@@ -1,0 +1,37 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.5.13/schema.json",
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true
+	},
+	"files": {
+		"ignoreUnknown": true
+	},
+	"formatter": {
+		"enabled": true,
+		"includes": ["app/**", "config/**", "lib/**", "plugins/**", "workers/**"]
+	},
+	"linter": {
+		"enabled": true,
+		"includes": ["app/**", "lib/**", "plugins/**", "workers/**"],
+		"rules": {
+			"preset": "none",
+			"style": {
+				"noNonNullAssertion": "warn"
+			},
+			"complexity": "warn",
+			"performance": "warn",
+			"correctness": "warn"
+		}
+	},
+	"css": {
+		"parser": {
+			"tailwindDirectives": true,
+			"cssModules": true
+		}
+	},
+	"assist": {
+		"enabled": true
+	}
+}
