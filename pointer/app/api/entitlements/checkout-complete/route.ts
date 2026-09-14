@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { type NextRequest, NextResponse } from "next/server";
+import process from "node:process";
 
 import { auth } from "@/lib/auth";
 import { getPool } from "@/lib/db";
@@ -11,10 +12,15 @@ function safeCallback(value: string | null): string {
 	return value?.startsWith("/") && !value.startsWith("//") ? value : "/";
 }
 
+// Use BETTER_AUTH_URL as the redirect base so that redirects resolve to the
+// public domain even when the app is behind a load balancer (request.url
+// would carry the internal EC2 hostname in that case).
+const appBase = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
+
 export async function GET(request: NextRequest): Promise<Response> {
 	const session = await auth.api.getSession({ headers: await headers() });
 	if (!session) {
-		return NextResponse.redirect(new URL("/sign-in?from=/", request.url));
+		return NextResponse.redirect(new URL("/sign-in?from=/", appBase));
 	}
 
 	const callbackURL = safeCallback(
@@ -81,5 +87,5 @@ export async function GET(request: NextRequest): Promise<Response> {
 		console.error("[entitlements] checkout refresh failed", error);
 	}
 
-	return NextResponse.redirect(new URL(callbackURL, request.url));
+	return NextResponse.redirect(new URL(callbackURL, appBase));
 }
