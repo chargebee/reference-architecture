@@ -1,6 +1,7 @@
 import { streamText } from "ai";
 
 import { chatModel } from "./openrouter";
+import { LOREM_MODEL, streamLoremIpsum } from "./lorem";
 
 const MAX_PROMPT_CHARS = 8_000;
 const MAX_OUTPUT_TOKENS = 4_096;
@@ -98,6 +99,10 @@ export function streamGeneration(
 	input: GenerateInput,
 	signal: AbortSignal,
 ): GenerationStream {
+	if (input.model === LOREM_MODEL) {
+		return streamLoremIpsum(input, signal);
+	}
+
 	let failure: unknown;
 
 	const result = streamText({
