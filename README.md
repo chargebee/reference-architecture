@@ -1,5 +1,9 @@
 # Chargebee Reference Architecture
 
+**Status**: This is a work in progress - please expect continuous updates until it's marked ready for public consumption.
+
+---
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./pointer/public/banner-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="./pointer/public/banner-light.svg">
@@ -14,7 +18,7 @@ The purpose of this repository is to showcase the best practices around integrat
 
 ## Audience
 
-- Architects and solution consultants who are looking for Chargebee's recommended practices when integrating various products with their platform
+- Architects and solution consultants who are looking for Chargebee's recommended practices when integrating our products with their platform
 
 - Developers who are looking to validate their integration code and ensure all edge-cases are covered
 
@@ -42,12 +46,20 @@ Each how-to is broken down into self-contained topics which addresses a specific
 
 These topics are written in plain markdown with mermaid diagrams wherever possible. It is written and edited by humans, but can be consumed by agents as well.
 
+## Where it fits in
+
+While the Chargebee [docs](https://chargebee.com/docs) and [apidocs](https://apidocs.chargebee.com) serve as the main source of reference from the product and engineering teams, they aren't structured for consuming topics in thin vertical slices - something the content in this repo aims to do.
+
+![information architecture](./pointer/public/information-architecture.png)
+
 ### Index
 
 | Topic | Status | Last Updated |
 |-------|--------|--------------|
 | [Integrating Chargebee webhooks](./how-to/webhooks.md) | In Review | |
 | [Enforcing entitlement checks](./how-to/entitlement-checks.md) | In Review | |
+| [Sync Chargebee entities](./how-to/sync-chargebee-entities.md) | Draft | |
+| [Usage based billing](./how-to/usage-based-billing.md) | Draft | |
 
 
 ## Reference App
@@ -62,8 +74,7 @@ These topics are written in plain markdown with mermaid diagrams wherever possib
 
 It was built from the ground up with the help of coding agents and Chargebee's official libraries and SDK. Although a considerable amount of code was generated via LLMs, the architecture and design of the app, and the how-to topics themselves are completely written and reviewed by humans.
 
-The purpose of building pointer along with the how-to topics is to ensure that they cover practical aspects of integrating Chargebee with a monetizable product. While the Chargebee [docs](https://chargebee.com/docs) and [apidocs](https://apidocs.chargebee.com) serve as the main source of reference from the product and engineering teams, they don't offer a comprehensive, traceable view of how to integrate a Chargebee platform feature end-to-end.
-
+The purpose of building pointer along with the how-to topics is to ensure that they cover practical aspects of integrating Chargebee with a monetizable product. 
 We aim to continuously evolve and expand the reference architecture as we build out Pointer with additional features - this mimics how an actual product team would go about integrating billing/subscription/entitlement/usage with their app.
 
 A high level overview of the pointer architecture is shown below. More details on the tech stack, components, infrastructure are detailed in [ARCHITECTURE.md](./pointer/ARCHITECTURE.md)
