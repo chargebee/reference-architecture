@@ -31,7 +31,9 @@ export function streamLoremIpsum(
 
 	async function* read(): AsyncGenerator<string> {
 		for (const word of words) {
-			if (signal.aborted) { break; }
+			if (signal.aborted) {
+				break;
+			}
 			const chunk = streamed.length === 0 ? word : ` ${word}`;
 			streamed += chunk;
 			yield chunk;

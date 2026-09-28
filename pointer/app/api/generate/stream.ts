@@ -3,23 +3,31 @@ import {
 	type ResolvedEntitlements,
 } from "@/lib/entitlements/features";
 import {
-	EntitlementGateError,
-	QUOTA_EXHAUSTED,
+	checkGenerationMidStream,
 	getUsageSnapshot,
 	meterGeneration,
+	QUOTA_EXHAUSTED,
+	type UsageThreshold,
 } from "@/lib/entitlements/gate";
 import type { EntitlementSubject } from "@/lib/entitlements/subject";
 import { emit } from "@/lib/events/emit";
-import { streamGeneration, type GenerateInput } from "@/lib/generate";
+import {
+	estimateTokens,
+	type GenerateInput,
+	type Generation,
+	streamGeneration,
+} from "@/lib/generate";
 import { claimUsageThreshold } from "@/lib/usage/counters";
 import { recordUsageEvent } from "@/lib/usage/events";
 
 import {
-	NDJSON_CONTENT_TYPE,
 	encodeFrame,
-	upgradeHint,
 	type GenerateFrame,
+	NDJSON_CONTENT_TYPE,
+	upgradeHint,
 } from "./frames";
+
+export const MID_STREAM_CHECK_INTERVAL_MS = 5_000;
 
 const STREAM_HEADERS = {
 	"content-type": NDJSON_CONTENT_TYPE,
@@ -35,69 +43,177 @@ export type GenerationContext = {
 	subject: EntitlementSubject;
 	entitlements: ResolvedEntitlements;
 	input: GenerateInput;
-	/** Output tokens the subscriber can pay for. The stream is cut here. */
-	outputTokenBudget: number;
 	traceId: string;
+	usageTimestamp: number;
+	outputTokenBudget?: number;
 };
 
 type Write = (frame: GenerateFrame) => void;
 
-async function pump(context: GenerationContext, write: Write): Promise<void> {
-	const { subject, entitlements, input, traceId } = context;
-	const trace = { source: "app" as const, trace_id: traceId };
-
-	const abort = new AbortController();
-	const generation = streamGeneration(input, abort.signal);
-
-	// Deltas carry no token counts, so the budget is policed on a running
-	// estimate and the upstream call is cut the moment it is spent.
-	let overBudget = false;
-	for await (const text of generation.deltas) {
-		write({ type: "delta", text });
-		if (generation.streamedTokens() <= context.outputTokenBudget) {
-			continue;
+async function alertThresholds(
+	context: GenerationContext,
+	thresholds: UsageThreshold[],
+	alerted: Set<string>,
+): Promise<void> {
+	const fresh = thresholds.filter((crossed) => {
+		if (alerted.has(crossed.featureId)) {
+			return false;
 		}
+		alerted.add(crossed.featureId);
+		return true;
+	});
 
-		overBudget = true;
-		abort.abort();
-		break;
-	}
+	await Promise.all(
+		fresh.map(async (crossed) => {
+			try {
+				if (
+					!(await claimUsageThreshold(
+						context.subject,
+						crossed.featureId,
+						new Date(context.usageTimestamp),
+					))
+				) {
+					return;
+				}
+				await emit(
+					"app.usage_threshold",
+					{
+						subscription_id: context.subject.chargebeeSubscriptionId,
+						feature_id: crossed.featureId,
+						percent: crossed.percent,
+					},
+					{ source: "app", trace_id: context.traceId },
+				);
+			} catch (error) {
+				// Alert delivery must not interrupt a paid generation.
+				console.error("[usage] failed to publish local threshold", error);
+			}
+		}),
+	);
+}
 
-	// Bill what the model produced, cut or not. A denial here means the ceiling
-	// was crossed anyway, which is the condition the budget watch fires on.
-	const settled = await generation.settle();
-	let consumed;
-	try {
-		consumed = await meterGeneration(subject, entitlements, settled);
-	} catch (error) {
-		if (!(error instanceof EntitlementGateError)) {
-			throw error;
-		}
-	}
+async function finishUsage(
+	context: GenerationContext,
+	usage: Generation,
+	alerted: Set<string>,
+) {
+	const { subject, entitlements, input, traceId, usageTimestamp } = context;
+	const consumed = await meterGeneration(subject, entitlements, {
+		inputTokens: usage.inputTokens,
+		outputTokens: usage.outputTokens,
+		at: new Date(usageTimestamp),
+	});
+
+	// Buffer billable usage before optional snapshot and alert work.
+	await recordUsageEvent({
+		deduplicationId: traceId,
+		subscriptionId: subject.chargebeeSubscriptionId,
+		usageTimestamp,
+		properties: {
+			generation_id: traceId,
+			model: input.model,
+			input_tokens: usage.inputTokens,
+			output_tokens: usage.outputTokens,
+			credits_consumed: consumed.creditsConsumed,
+			usage_source: consumed.source,
+			plan_id: subject.subscription.planId ?? "unknown",
+		},
+	});
 
 	const limits = await getUsageSnapshot(subject, entitlements);
+	await alertThresholds(context, limits.thresholds, alerted);
 
-	if (overBudget || !consumed) {
-		write({
-			type: "error",
-			error: "quota_exceeded",
-			message: QUOTA_EXHAUSTED,
-			featureId: features.creditsMonthly.featureId,
-			upgradeHint: upgradeHint("buy_credits"),
-			limits,
-		});
-		await emit(
-			"app.generate_denied",
-			{
-				subscription_id: subject.chargebeeSubscriptionId,
-				model: input.model,
-				error: "quota_exceeded",
-				feature_id: features.creditsMonthly.featureId,
-			},
-			trace,
-		);
-		return;
+	return { consumed, limits };
+}
+
+async function forwardDeltas(options: {
+	context: GenerationContext;
+	generation: ReturnType<typeof streamGeneration>;
+	abort: AbortController;
+	alerted: Set<string>;
+	write: Write;
+}): Promise<{ quotaHit: boolean; failure?: unknown }> {
+	const { context, generation, abort, alerted, write } = options;
+	const { subject, entitlements, input, usageTimestamp, outputTokenBudget } =
+		context;
+	const inputTokens = estimateTokens(input.prompt);
+
+	let lastCheck = Date.now();
+	let quotaHit = false;
+
+	try {
+		for await (const text of generation.deltas) {
+			const outputTokens = generation.streamedTokens();
+
+			// 1. Fast local check against outputTokenBudget calculated at admission.
+			if (outputTokenBudget !== undefined && outputTokens > outputTokenBudget) {
+				abort.abort();
+				quotaHit = true;
+				break;
+			}
+
+			// 2. Periodic mid-stream check (every 5 seconds) to catch concurrent usage or threshold crossing.
+			const now = Date.now();
+			if (now - lastCheck >= MID_STREAM_CHECK_INTERVAL_MS) {
+				lastCheck = now;
+				const progress = await checkGenerationMidStream(subject, entitlements, {
+					inputTokens,
+					outputTokens,
+					at: new Date(usageTimestamp),
+				});
+				await alertThresholds(context, progress.thresholds, alerted);
+
+				if (!progress.allowed) {
+					abort.abort();
+					quotaHit = true;
+					break;
+				}
+			}
+
+			write({ type: "delta", text });
+		}
+	} catch (error) {
+		abort.abort();
+		return { quotaHit, failure: error };
 	}
+
+	return { quotaHit };
+}
+
+async function denyQuota(
+	context: GenerationContext,
+	limits: Awaited<ReturnType<typeof getUsageSnapshot>>,
+	write: Write,
+): Promise<void> {
+	write({
+		type: "error",
+		error: "quota_exceeded",
+		message: QUOTA_EXHAUSTED,
+		featureId: features.creditsMonthly.featureId,
+		upgradeHint: upgradeHint("buy_credits"),
+		limits,
+	});
+	await emit(
+		"app.generate_denied",
+		{
+			subscription_id: context.subject.chargebeeSubscriptionId,
+			model: context.input.model,
+			error: "quota_exceeded",
+			feature_id: features.creditsMonthly.featureId,
+		},
+		{ source: "app", trace_id: context.traceId },
+	);
+}
+
+async function completeGeneration(options: {
+	context: GenerationContext;
+	settled: Generation;
+	finished: Awaited<ReturnType<typeof finishUsage>>;
+	write: Write;
+}): Promise<void> {
+	const { context, settled, finished, write } = options;
+	const { input, traceId, subject } = context;
+	const { consumed, limits } = finished;
 
 	write({
 		type: "done",
@@ -122,41 +238,50 @@ async function pump(context: GenerationContext, write: Write): Promise<void> {
 			credits_consumed: consumed.creditsConsumed,
 			usage_source: consumed.source,
 		},
-		trace,
+		{ source: "app", trace_id: traceId },
 	);
+}
 
-	// Buffered for Chargebee only on the settled path, so what reaches the
-	// billing system of record matches what the local counters were charged.
-	// A denial never incremented them, so there is no usage to report.
-	await recordUsageEvent({
-		deduplicationId: traceId,
-		subscriptionId: subject.chargebeeSubscriptionId,
-		usageTimestamp: Date.now(),
-		properties: {
-			generation_id: traceId,
-			model: input.model,
-			input_tokens: settled.inputTokens,
-			output_tokens: settled.outputTokens,
-			credits_consumed: consumed.creditsConsumed,
-			usage_source: consumed.source,
-			plan_id: subject.subscription.planId ?? "unknown",
-		},
-	});
+async function pump(context: GenerationContext, write: Write): Promise<void> {
+	const abort = new AbortController();
+	const alerted = new Set<string>();
+	let generation: ReturnType<typeof streamGeneration>;
 
-	for (const crossed of limits.thresholds) {
-		if (!(await claimUsageThreshold(subject, crossed.featureId))) {
-			continue;
-		}
-		await emit(
-			"app.usage_threshold",
+	try {
+		generation = streamGeneration(context.input, abort.signal);
+	} catch (error) {
+		await finishUsage(
+			context,
 			{
-				subscription_id: subject.chargebeeSubscriptionId,
-				feature_id: crossed.featureId,
-				percent: crossed.percent,
+				output: "",
+				inputTokens: estimateTokens(context.input.prompt),
+				outputTokens: 0,
 			},
-			trace,
+			alerted,
 		);
+		throw error;
 	}
+
+	const streamed = await forwardDeltas({
+		context,
+		generation,
+		abort,
+		alerted,
+		write,
+	});
+	// Provider totals replace estimates. The crossing chunk remains recorded.
+	const settled = await generation.settle();
+	const finished = await finishUsage(context, settled, alerted);
+
+	if (streamed.quotaHit || !finished.consumed.allowed) {
+		await denyQuota(context, finished.limits, write);
+		return;
+	}
+	if (streamed.failure) {
+		throw streamed.failure;
+	}
+
+	await completeGeneration({ context, settled, finished, write });
 }
 
 /**

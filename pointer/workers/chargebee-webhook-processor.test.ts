@@ -1,7 +1,7 @@
 import {
 	ChangeMessageVisibilityCommand,
-	SendMessageCommand,
 	type Message,
+	SendMessageCommand,
 	type SQSClient,
 } from "@aws-sdk/client-sqs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -48,6 +48,7 @@ vi.mock("@/lib/webhooks/webhook-guards", () => ({
 }));
 vi.mock("@/plugins/chargebee-plugin", () => ({
 	chargebeePluginOptions: {},
+	chargebeeClient: {},
 }));
 
 import {

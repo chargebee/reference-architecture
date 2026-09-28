@@ -1,15 +1,13 @@
+import process from "node:process";
 import { afterAll, describe, expect, it } from "vitest";
-
-import { getRedis } from "@/lib/redis";
 import type { EntitlementSubject } from "@/lib/entitlements/subject";
-
+import { getRedis } from "@/lib/redis";
 import {
 	claimUsageThreshold,
 	consumeGenerationUsage,
 	consumeRateLimit,
 	readUsageCounters,
 } from "./counters";
-import process from "node:process";
 
 const redisTests =
 	process.env.RUN_REDIS_TESTS === "1" ? describe : describe.skip;
@@ -62,50 +60,65 @@ redisTests("Redis usage enforcement", () => {
 		});
 	});
 
-	it("rolls back denied token usage and spends only incremental overage", async () => {
-		const hardCap = subject(`hard-${suffix}`);
-		await expect(
-			consumeGenerationUsage(
-				hardCap,
-				{
-					inputTokensDaily: 5,
-					outputTokensDaily: 5,
-					creditsMonthly: 0,
-				},
-				{ inputTokens: 5, outputTokens: 5 },
-			),
-		).resolves.toMatchObject({ allowed: true, inputUsed: 5, outputUsed: 5 });
-		await expect(
-			consumeGenerationUsage(
-				hardCap,
-				{
-					inputTokensDaily: 5,
-					outputTokensDaily: 5,
-					creditsMonthly: 0,
-				},
-				{ inputTokens: 1, outputTokens: 1 },
-			),
-		).resolves.toMatchObject({ allowed: false, inputUsed: 5, outputUsed: 5 });
+	it("resets request aggregation at the next UTC minute", async () => {
+		const target = subject(`rate-window-${suffix}`);
+		const now = new Date();
+		now.setUTCSeconds(50, 0);
 
-		const credits = subject(`credits-${suffix}`);
+		await consumeRateLimit(target, 1, now);
+		await expect(consumeRateLimit(target, 1, now)).resolves.toMatchObject({
+			allowed: false,
+			retryAfterSeconds: 10,
+		});
 		await expect(
-			consumeGenerationUsage(
-				credits,
-				{
-					inputTokensDaily: 1,
-					outputTokensDaily: 10,
-					creditsMonthly: 1,
-				},
-				{ inputTokens: 1_001, outputTokens: 0 },
-			),
+			consumeRateLimit(target, 1, new Date(now.getTime() + 10_000)),
+		).resolves.toMatchObject({ allowed: true, used: 1 });
+	});
+
+	it("consumes daily quota and spills overage to credits", async () => {
+		const credits = subject(`credits-${suffix}`);
+		const limits = {
+			inputTokensDaily: 1,
+			outputTokensDaily: 10,
+			creditsMonthly: 1,
+		};
+
+		await expect(
+			consumeGenerationUsage(credits, limits, {
+				inputTokens: 1_001,
+				outputTokens: 0,
+			}),
 		).resolves.toMatchObject({
 			allowed: true,
+			inputUsed: 1_001,
 			creditsConsumed: 1,
-			overageInputTokens: 1_000,
+			creditsUsed: 1,
 		});
+
 		await expect(readUsageCounters(credits)).resolves.toMatchObject({
 			inputUsed: 1_001,
 			creditsUsed: 1,
+		});
+	});
+
+	it("denies and records overage when quota and credits are exhausted", async () => {
+		const target = subject(`settle-${suffix}`);
+		const limits = {
+			inputTokensDaily: 2,
+			outputTokensDaily: 1,
+			creditsMonthly: 0,
+		};
+
+		await expect(
+			consumeGenerationUsage(target, limits, {
+				inputTokens: 1,
+				outputTokens: 2,
+			}),
+		).resolves.toMatchObject({
+			allowed: false,
+			inputUsed: 0,
+			outputUsed: 0,
+			creditsConsumed: 0.004,
 		});
 	});
 

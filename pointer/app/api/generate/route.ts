@@ -3,7 +3,7 @@ import { v7 as uuidv7 } from "uuid";
 
 import { auth } from "@/lib/auth";
 import { resolveEntitlements } from "@/lib/entitlements/features";
-import { EntitlementGateError, admitGeneration } from "@/lib/entitlements/gate";
+import { admitGeneration, EntitlementGateError } from "@/lib/entitlements/gate";
 import { resolveEntitlementSubject } from "@/lib/entitlements/subject";
 import { emit } from "@/lib/events/emit";
 import {
@@ -54,6 +54,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 	// One id ties every event this request emits, including a pre-flight denial
 	// that never reaches the model.
 	const traceId = uuidv7();
+	const usageTimestamp = Date.now();
 	const inputTokens = estimateTokens(input.prompt);
 	await emit(
 		"app.generate_requested",
@@ -74,17 +75,19 @@ export async function POST(request: NextRequest): Promise<Response> {
 		// a new subscriber can generate without waiting on Chargebee.
 		const entitlements = await resolveEntitlements(subject);
 		entitlementsPending = entitlements.pending;
-		const admitted = await admitGeneration(subject, entitlements, {
+		const admission = await admitGeneration(subject, entitlements, {
 			model: input.model,
 			inputTokens,
+			at: new Date(usageTimestamp),
 		});
 
 		return generationResponse({
 			subject,
 			entitlements,
 			input,
-			outputTokenBudget: admitted.outputTokenBudget,
 			traceId,
+			usageTimestamp,
+			outputTokenBudget: admission.outputTokenBudget,
 		});
 	} catch (error) {
 		if (error instanceof EntitlementGateError) {

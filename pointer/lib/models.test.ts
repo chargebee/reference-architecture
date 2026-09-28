@@ -7,15 +7,19 @@ import { isModelAllowed, loadModelTiers, modelsForTier } from "./models";
 describe("model entitlement mapping", () => {
 	it("loads every documented model tier", async () => {
 		const tiers = await loadModelTiers();
-		expect(tiers.basic).toContain("openai/gpt-4o-mini");
-		expect(tiers.advanced).toContain("openai/gpt-4o");
-		expect(tiers.premium).toContain("openai/gpt-5");
+		expect(tiers.basic).toContain("poolside/laguna-s-2.1:free");
+		expect(tiers.advanced).toContain("nvidia/nemotron-3.5-lightning:free");
+		expect(tiers.premium).toContain("google/gemma-4-31b-it:free");
 		expect(tiers.enterprise).toContain("*");
 	});
 
 	it("enforces lower tiers and enterprise wildcards", async () => {
-		await expect(isModelAllowed("basic", "openai/gpt-5")).resolves.toBe(false);
-		await expect(isModelAllowed("premium", "openai/gpt-5")).resolves.toBe(true);
+		await expect(
+			isModelAllowed("basic", "google/gemma-4-31b-it:free"),
+		).resolves.toBe(false);
+		await expect(
+			isModelAllowed("premium", "google/gemma-4-31b-it:free"),
+		).resolves.toBe(true);
 		await expect(isModelAllowed("enterprise", "private-model")).resolves.toBe(
 			true,
 		);
