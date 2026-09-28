@@ -14,7 +14,7 @@ The purpose of this repository is to showcase the best practices around integrat
 
 - A collection of in-depth, technical how-tos which cover the Chargebee recommended best practices when integrating various billing and usage related Chargebee products
 
-- A opinionated, fully functional and deployable application built to demonstrate how these concepts translate to code
+- An opinionated, fully functional and deployable application built to demonstrate how these concepts translate to code
 
 ## Audience
 
@@ -26,25 +26,25 @@ The purpose of this repository is to showcase the best practices around integrat
 
 ## What it covers
 
-The topics below cover the best practices to achieve the required outcome and are vetted and updated continuously. They cover implementation details, edge cases to handle, testing scenarios, etc. To bridge the gap between documentation and implementation, each of these topics are actually implemented in code. The [pointer](../pointer/README.md) app is our demo application built with an opinionated tech stack with all the required pieces to spin up a working SaaS platform. 
+The topics below cover the best practices to achieve the required outcome and are vetted and updated continuously. They cover implementation details, edge cases to handle, testing scenarios, etc. To bridge the gap between documentation and implementation, each of these topics is actually implemented in code. The [Pointer](./pointer/README.md) app is our demo application built with an opinionated tech stack with all the required pieces to spin up a working SaaS platform. 
 
 Regardless of your tech stack or hosting platform, each how-to covers the functional/non-functional requirements and a production go-live checklist to help you along the journey.
 
-Each how-to is broken down into self-contained topics which addresses a specific scenario. It can include:
+Each how-to is broken down into self-contained topics that addresses a specific scenario. It can include:
 
 - Architecture or flow diagrams
 
-- Pseudocode showing how certain cases maybe structured in code
+- Pseudocode showing how certain cases may be structured in code
 
 - Best practices to keep in mind, and testing scenarios which are useful in validating your implementation
 
-- Do's and Dont's
+- Do's and Don'ts
 
 - An overview of how that topic is implemented in the demo app along with the relevant source files to look at
 
-- A go-live checklist of must do steps to pay attention to before your app gets deployed to production environments
+- A go-live checklist of must-do steps to pay attention to before your app gets deployed to production environments
 
-These topics are written in plain markdown with mermaid diagrams wherever possible. It is written and edited by humans, but can be consumed by agents as well.
+These topics are written in plain Markdown with mermaid diagrams wherever possible. They are written and edited by humans, but can be consumed by agents as well.
 
 ## Where it fits in
 
@@ -70,16 +70,16 @@ While the Chargebee [docs](https://chargebee.com/docs) and [apidocs](https://api
   </a>
 </p>
 
-[Pointer](https://pointer.chargebee-labs.com) is our reference app which mimics a LLM/AI API provider that is PLG (product led growth) driven. A developer signs up, uses their daily token allowance, and upgrades to Pro to keep going. Chargebee handles the subscription, entitlements, usage tracking and alerts.
+[Pointer](https://pointer.chargebee-labs.com) is our reference app which mimics an LLM/AI API provider that is PLG (product-led growth) driven. A developer signs up, uses their daily token allowance, and upgrades to Pro to keep going. Chargebee handles the subscription, entitlements, usage tracking and alerts.
 
 It was built from the ground up with the help of coding agents and Chargebee's official libraries and SDK. Although a considerable amount of code was generated via LLMs, the architecture and design of the app, and the how-to topics themselves are completely written and reviewed by humans.
 
-The purpose of building pointer along with the how-to topics is to ensure that they cover practical aspects of integrating Chargebee with a monetizable product. 
-We aim to continuously evolve and expand the reference architecture as we build out Pointer with additional features - this mimics how an actual product team would go about integrating billing/subscription/entitlement/usage with their app.
+The purpose of building Pointer along with the how-to topics is to ensure that they cover practical aspects of integrating Chargebee with a monetizable product. 
+We aim to continuously evolve and expand the reference architecture as we build out Pointer with additional features - this mimics how an actual product team would go about integrating billing, subscription, entitlement, and usage management into their app.
 
-A high level overview of the pointer architecture is shown below. More details on the tech stack, components, infrastructure are detailed in [ARCHITECTURE.md](./pointer/ARCHITECTURE.md)
+A high-level overview of the Pointer architecture is shown below. Further details on the tech stack, components, and infrastructure are provided in [ARCHITECTURE.md](./pointer/ARCHITECTURE.md).
 
-![pointer architecture](./pointer/public/pointer-components.svg)
+![Pointer architecture](./pointer/public/pointer-components.svg)
 
 ## Links
 

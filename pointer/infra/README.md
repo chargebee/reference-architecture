@@ -11,7 +11,6 @@ pointer/infra/
   versions.tf providers.tf variables.tf
   vpc.tf ecr.tf acm.tf alb.tf ecs.tf rds.tf sqs.tf route53.tf outputs.tf
   backend.hcl.example terraform.tfvars.example
-  writability-test/      <- separate stack to verify AWS write access
 ```
 
 ## What gets created
@@ -331,7 +330,3 @@ The full DB credential bundle (username, password, host, port, dbname, database_
 - RDS `skip_final_snapshot = true`, `deletion_protection = false`.
 - ECR `force_delete = true`.
 - No WAF, no VPC Flow Logs, no ALB access logs, no Performance Insights / Enhanced Monitoring.
-
-## Related stacks
-
-- [`writability-test/`](writability-test/) — separate, disposable stack used to verify the AWS profile can write into the account.
