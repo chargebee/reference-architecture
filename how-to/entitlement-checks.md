@@ -121,9 +121,9 @@ async function handleEntitlementsUpdated(event) {
 * Update the snapshot for the customer/subscription
 * Invalidate cache after DB write
 
-✅ **Recommended**: Webhooks must be processed near real-time to ensure entitlements aren't exceeded
+✅ **Do**: Webhooks must be processed near real-time to ensure entitlements aren't exceeded
 
-⚠️ **Not recommended**: Calling Chargebee API during the user request, which will use up your API quota quickly and degrade the experience of your customer
+⚠️ **Don't**: Calling Chargebee API during the user request, which will use up your API quota quickly and degrade the experience of your customer
 
 
 ## 4. Handling Subscription Upgrades and Downgrades
@@ -163,11 +163,11 @@ async function onCheckoutSuccess(subscriptionId) {
 }
 ```
 
-⚠️ **Not recommended**: Waiting for the webhook to trigger fetching the updated entitlements (causes upgrade lag)
+⚠️ **Don't**: Waiting for the webhook to trigger fetching the updated entitlements (causes upgrade lag)
 
-⚠️ **Not recommended**: Calling Chargebee in the feature gate (adds latency to every request)
+⚠️ **Don't**: Calling Chargebee in the feature gate (adds latency to every request)
 
-⚠️ **Not recommended**: Letting cache naturally expire when downgrading (customer gets free access for anywhere between a few seconds to minutes)
+⚠️ **Don't**: Letting cache naturally expire when downgrading (customer gets free access for anywhere between a few seconds to minutes)
 
 ## 5. Entitlement Overrides
 

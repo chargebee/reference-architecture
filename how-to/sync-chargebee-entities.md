@@ -71,11 +71,11 @@ if (!subscription) {
 }
 ```
 
-✅ Recommended: Store external IDs (chargebeeCustomerId, chargebeeSubscriptionId) on user records as join keys
+✅ **Do**: Store external IDs (chargebeeCustomerId, chargebeeSubscriptionId) on user records as join keys
 
-✅ Recommended: Skip mirroring resources your app only accesses through the hosted billing portal (e.g., historical invoice PDFs)
+✅ **Do**: Skip mirroring resources your app only accesses through the hosted billing portal (e.g., historical invoice PDFs)
 
-⚠️ Not recommended: Treating local database columns as authoritative for subscription status; local edits that bypass Chargebee cause data drift
+⚠️ **Don't**: Treating local database columns as authoritative for subscription status; local edits that bypass Chargebee cause data drift
 
 
 ## 2. What The Worker Does
@@ -116,11 +116,11 @@ await db.transaction(async (tx) => {
 await ack();
 ```
 
-✅ Recommended: Commit the entity update and the version cursor in the same database transaction
+✅ **Do**: Commit the entity update and the version cursor in the same database transaction
 
-✅ Recommended: Acknowledge the queue message only after the database transaction succeeds
+✅ **Do**: Acknowledge the queue message only after the database transaction succeeds
 
-⚠️ Not recommended: Running database upserts inline within the HTTP webhook endpoint
+⚠️ **Don't**: Running database upserts inline within the HTTP webhook endpoint
 
 
 ## 3. Handling Ordering With resource_version
@@ -163,9 +163,9 @@ SET version = EXCLUDED.version, updated_at = NOW()
 WHERE EXCLUDED.version > chargebee_resource_version.version;
 ```
 
-✅ Recommended: Compare resource_version for every individual entity in event.content
+✅ **Do**: Compare resource_version for every individual entity in event.content
 
-⚠️ Not recommended: Maintaining a single global version cursor for the entire site
+⚠️ **Don't**: Maintaining a single global version cursor for the entire site
 
 ## 4. Handling Subscription Upgrades (Preventing Split-Brain)
 
@@ -205,11 +205,11 @@ const { subscription } = await chargebee.subscription.updateForItems(subId, {
 await syncSubscriptionMirror(subscription);
 ```
 
-✅ Recommended: Update local mirror state using the Chargebee API response immediately after checkout/upgrade mutations
+✅ **Do**: Update local mirror state using the Chargebee API response immediately after checkout/upgrade mutations
 
-⚠️ Not recommended: Updating local subscription status optimistically before Chargebee responds
+⚠️ **Don't**: Updating local subscription status optimistically before Chargebee responds
 
-⚠️ Not recommended: Waiting purely for the webhook after checkout without refreshing locally, which causes visible upgrade lag for the user
+⚠️ **Don't**: Waiting purely for the webhook after checkout without refreshing locally, which causes visible upgrade lag for the user
 
 
 ## 5. Reconciling Gaps After Outages
@@ -266,11 +266,11 @@ do {
 } while (offset);
 ```
 
-✅ Recommended: Run a daily reconciliation cron to catch any drifted rows
+✅ **Do**: Run a daily reconciliation cron to catch any drifted rows
 
-✅ Recommended: Reuse the same idempotent worker logic for event replay and webhooks
+✅ **Do**: Reuse the same idempotent worker logic for event replay and webhooks
 
-⚠️ Not recommended: Deleting local rows during reconciliation if an event is missing; verify current status with retrieve first
+⚠️ **Don't**: Deleting local rows during reconciliation if an event is missing; verify current status with retrieve first
 
 
 ## 6. Cold Start And Backfill
@@ -299,9 +299,9 @@ Bootstrap sequence:
 3. Seed Version Cursors: Populate the chargebee_resource_version table with current timestamps from the API response so incoming webhooks do not replay older state.
 4. Enable Webhook Ingress: Enable worker processing. Steady-state updates take over seamlessly.
 
-✅ Recommended: Seed version cursors during backfill to avoid unnecessary worker replay
+✅ **Do**: Seed version cursors during backfill to avoid unnecessary worker replay
 
-⚠️ Not recommended: Relying on webhooks alone to populate state on an empty database
+⚠️ **Don't**: Relying on webhooks alone to populate state on an empty database
 
 ## See It Running In The Demo App
 

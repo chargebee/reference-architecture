@@ -58,13 +58,13 @@ return new Response(null, { status: 200 });
 
 If the enqueue fails, return a `5xx`. Chargebee then [retries the delivery](https://www.chargebee.com/docs/billing/2.0/site-configuration/webhook_settings), so nothing is lost.
 
-✅ **Recommended**: Return `200` as soon as the event is durably stored
+✅ **Do**: Return `200` as soon as the event is durably stored
 
-✅ **Recommended**: Return `5xx` when you could not store it, and let Chargebee redeliver
+✅ **Do**: Return `5xx` when you could not store it, and let Chargebee redeliver
 
-⚠️ **Not recommended**: Updating your database, calling the Chargebee API, or sending email inside the endpoint. A slow dependency turns into a webhook timeout and a retry storm.
+⚠️ **Don't**: Updating your database, calling the Chargebee API, or sending email inside the endpoint. A slow dependency turns into a webhook timeout and a retry storm.
 
-⚠️ **Not recommended**: Returning `200` on an error to "keep Chargebee quiet". The event is then gone for good.
+⚠️ **Don't**: Returning `200` on an error to "keep Chargebee quiet". The event is then gone for good.
 
 ## 3. What The Worker Does
 
@@ -111,9 +111,9 @@ await commitVersions(event);
 * Throwing (not acknowledging) puts the message back on the queue for another attempt
 * Scaling out means running more worker processes — the queue's visibility timeout stops two workers from applying the same event
 
-✅ **Recommended**: One worker per queue, scaled horizontally, with the queue's retry and dead-letter policy doing the error handling
+✅ **Do**: One worker per queue, scaled horizontally, with the queue's retry and dead-letter policy doing the error handling
 
-⚠️ **Not recommended**: Doing the sync in a `setTimeout` or fire-and-forget promise in the web process. A deploy or a crash drops the event silently.
+⚠️ **Don't**: Doing the sync in a `setTimeout` or fire-and-forget promise in the web process. A deploy or a crash drops the event silently.
 
 ## 4. Handling Duplicate Deliveries
 
@@ -126,9 +126,9 @@ INSERT INTO webhook_event (id) VALUES ($1) ON CONFLICT (id) DO NOTHING;
 
 Chargebee's [last retry lands about 3 days and 7 hours](https://apidocs.chargebee.com/docs/api/events) after the original event, so keep event IDs for at least that long before purging them.
 
-✅ **Recommended**: Writing every applied event `id` to a table, and making your upserts idempotent so a duplicate is a no-op
+✅ **Do**: Writing every applied event `id` to a table, and making your upserts idempotent so a duplicate is a no-op
 
-⚠️ **Not recommended**: Deduplicating on `(event_type, subscription_id)`. Two legitimate changes to the same subscription share that key.
+⚠️ **Don't**: Deduplicating on `(event_type, subscription_id)`. Two legitimate changes to the same subscription share that key.
 
 ## 5. Handling Out-Of-Order Events
 
@@ -143,9 +143,9 @@ if (event.content.subscription.resource_version <= stored.resourceVersion) retur
 
 The payload is a point-in-time snapshot taken when the change happened, and it does not change on retries. When you need the current state instead of the snapshot, call the resource's retrieve endpoint.
 
-✅ **Recommended**: Storing the applied `resource_version` per resource, and only advancing it forward
+✅ **Do**: Storing the applied `resource_version` per resource, and only advancing it forward
 
-⚠️ **Not recommended**: Ordering events by `occurred_at`. It tells you when the change happened, not whether your row is newer.
+⚠️ **Don't**: Ordering events by `occurred_at`. It tells you when the change happened, not whether your row is newer.
 
 ## 6. Handling Dependent Events That Arrive Early
 
@@ -179,11 +179,11 @@ if (!(await customerExists(event.content.subscription.customer_id))) {
 
 Exempt the resource the event itself creates. A `customer_created` event must not wait for the customer to already exist.
 
-✅ **Recommended**: Retrying the dependent event with increasing backoff until its parent lands
+✅ **Do**: Retrying the dependent event with increasing backoff until its parent lands
 
-⚠️ **Not recommended**: Dropping the event, or returning `5xx` to Chargebee. You already stored it, so the retry belongs to your queue.
+⚠️ **Don't**: Dropping the event, or returning `5xx` to Chargebee. You already stored it, so the retry belongs to your queue.
 
-⚠️ **Not recommended**: Fetching the missing parent from the Chargebee API inline. It works, but it hides genuine ordering problems and burns API quota on every gap.
+⚠️ **Don't**: Fetching the missing parent from the Chargebee API inline. It works, but it hides genuine ordering problems and burns API quota on every gap.
 
 ## 7. Handling Poison Messages
 
@@ -196,9 +196,9 @@ if (!event.id) throw new PoisonWebhookError("webhook body is missing an event id
 
 Send them to a [dead letter queue](https://en.wikipedia.org/wiki/Dead_letter_queue), alert when it is non-empty, and keep a way to replay messages back onto the main queue once the bug is fixed. Chargebee can also resend a webhook manually from **Logs > Events**, which is the fallback when a message is lost entirely.
 
-✅ **Recommended**: Separating "retry patiently" from "fail fast", so a malformed payload and a late parent event get different treatment
+✅ **Do**: Separating "retry patiently" from "fail fast", so a malformed payload and a late parent event get different treatment
 
-⚠️ **Not recommended**: A single `catch` that retries everything. Poison messages then retry for days and bury the real failures.
+⚠️ **Don't**: A single `catch` that retries everything. Poison messages then retry for days and bury the real failures.
 
 ## 8. Retry And Retention Settings
 
@@ -231,9 +231,9 @@ Check the event's `api_version` against the API version your client library targ
 
 If you already run on AWS and your event volume is high, [Event Streaming via AWS EventBridge](https://www.chargebee.com/docs/billing/2.0/site-configuration/webhook_settings) delivers the same events without an HTTP endpoint to operate. The endpoint in section 2 disappears; everything from section 3 onwards still applies.
 
-✅ **Recommended**: One endpoint owning the billing mirror, subscribed to the specific event types your app handles
+✅ **Do**: One endpoint owning the billing mirror, subscribed to the specific event types your app handles
 
-⚠️ **Not recommended**: Pointing several services at the same endpoint and fanning out from there without a queue. One slow consumer then times out the webhook for everyone.
+⚠️ **Don't**: Pointing several services at the same endpoint and fanning out from there without a queue. One slow consumer then times out the webhook for everyone.
 
 ## See It Running In The Demo App
 

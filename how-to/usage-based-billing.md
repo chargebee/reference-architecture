@@ -46,9 +46,9 @@ await stream.xadd("usage_events", "*", "event", JSON.stringify({
     properties: { input_tokens: 150, output_tokens: 420 }
 }));
   ```
-✅ **Recommended**: Buffer usage events in-memory or in an append-only stream (sub-millisecond) before returning to the caller.
+✅ **Do**: Buffer usage events in-memory or in an append-only stream (sub-millisecond) before returning to the caller.
 
-⚠️ **Not recommended**: Calling Chargebee's ingest endpoint inline during a user request. External latency degrades user experience and creates cascading timeouts.
+⚠️ **Don't**: Calling Chargebee's ingest endpoint inline during a user request. External latency degrades user experience and creates cascading timeouts.
 
 
 ## 2. What The Worker Does
@@ -91,9 +91,9 @@ await stream.xack("usage_events", "worker_group", batch.map((e) => e.streamId));
 * Acknowledge messages only after Chargebee returns `200`.
 * If Chargebee is temporarily unavailable, leave messages on the buffer and retry with exponential backoff.
 
-✅ **Recommended**: Keep batches large (up to 500) to minimize HTTP round-trips and preserve API quota.
+✅ **Do**: Keep batches large (up to 500) to minimize HTTP round-trips and preserve API quota.
 
-⚠️ **Not recommended**: Acknowledging the queue before Chargebee returns `200`. A worker crash mid-flight permanently loses billable revenue.
+⚠️ **Don't**: Acknowledging the queue before Chargebee returns `200`. A worker crash mid-flight permanently loses billable revenue.
 
 
 ## 3. Enforcing Limits: App vs Chargebee
@@ -131,9 +131,9 @@ if (current > allowance) {
 }
 ```
 
-✅ **Recommended**: Enforce hard limits and concurrency caps against local counters in Redis.
+✅ **Do**: Enforce hard limits and concurrency caps against local counters in Redis.
 
-⚠️ **Not recommended**: Polling Chargebee's `usage_charges` endpoint on each request to determine whether to allow user actions.
+⚠️ **Don't**: Polling Chargebee's `usage_charges` endpoint on each request to determine whether to allow user actions.
 
 ## 4. Handling Upgrades and Overages
 When a customer exhausts their included allowance, they either purchase credit top-ups, upgrade their tier, or spill over into metered pay-as-you-go pricing.
@@ -167,9 +167,9 @@ await chargebee.subscriptionEntitlement.subscriptionEntitlementsForSubscription(
 await redis.del(`quota:${subId}:tokens`);
 ```
 
-✅ **Recommended**: Reset local enforcement counters immediately on the checkout return handler.
+✅ **Do**: Reset local enforcement counters immediately on the checkout return handler.
 
-⚠️ **Not recommended**: Waiting for the `subscription_entitlements_updated` webhook to unlock limits. Webhook delivery delays make users wait minutes after paying.
+⚠️ **Don't**: Waiting for the `subscription_entitlements_updated` webhook to unlock limits. Webhook delivery delays make users wait minutes after paying.
 
 ## 5. Handling Duplicate and Late Events
 Networks drop and workers retry. Chargebee deduplicates using a composite key: `(subscription_id, usage_timestamp, deduplication_id)`.
@@ -196,9 +196,9 @@ const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
 const isExpired = (event: UsageEvent) => (Date.now() - event.usage_timestamp) > TWELVE_HOURS_MS;
 ```
 
-✅ **Recommended**: Use a deterministic UUID or request trace ID as your `deduplication_id`.
+✅ **Do**: Use a deterministic UUID or request trace ID as your `deduplication_id`.
 
-⚠️ **Not recommended**: Infinitely retrying batches containing events older than 12 hours. The entire batch will fail repeatedly.
+⚠️ **Don't**: Infinitely retrying batches containing events older than 12 hours. The entire batch will fail repeatedly.
 
 
 ## 6. Invoicing and Period-Close Reconciliation
@@ -239,9 +239,9 @@ if (drift > TOLERANCE) {
 }
 ```
 
-✅ **Recommended**: Compare local raw-event rollups against Chargebee's `usage_summaries` automatically on every invoice.
+✅ **Do**: Compare local raw-event rollups against Chargebee's `usage_summaries` automatically on every invoice.
 
-⚠️ **Not recommended**: Overwriting local usage data with Chargebee's invoice values without auditing discrepancies.
+⚠️ **Don't**: Overwriting local usage data with Chargebee's invoice values without auditing discrepancies.
 
 
 ## See It Running In The Demo App
