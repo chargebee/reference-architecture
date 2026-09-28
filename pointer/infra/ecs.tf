@@ -90,28 +90,11 @@ resource "aws_iam_role" "task" {
 }
 
 data "aws_iam_policy_document" "task_sqs" {
-  # The app always publishes validated webhooks and entitlement jobs. Consumer
-  # actions are only needed when the same role is also used by the ECS worker.
+  # The app publishes validated webhooks and entitlement jobs. The independently
+  # scaled worker has its own role and consumer policy.
   statement {
-    actions = concat(
-      ["sqs:SendMessage"],
-      local.ecs_worker_enabled ? [
-        "sqs:ReceiveMessage",
-        "sqs:DeleteMessage",
-        "sqs:GetQueueAttributes",
-        "sqs:GetQueueUrl",
-        "sqs:ChangeMessageVisibility",
-      ] : [],
-    )
+    actions   = ["sqs:SendMessage"]
     resources = [aws_sqs_queue.main.arn]
-  }
-
-  dynamic "statement" {
-    for_each = local.ecs_worker_enabled ? [true] : []
-    content {
-      actions   = ["sqs:SendMessage"]
-      resources = [aws_sqs_queue.dlq.arn]
-    }
   }
 }
 

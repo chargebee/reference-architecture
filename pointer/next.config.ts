@@ -3,8 +3,14 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   transpilePackages: ["@chargebee/better-auth"],
+  serverExternalPackages: ["@duckdb/node-api", "@duckdb/node-bindings"],
   outputFileTracingIncludes: {
-    "/*": ["./config/models.yaml"],
+    "/*": [
+      "./config/models.yaml",
+      "./node_modules/@duckdb/node-bindings-*/*.node",
+      "./node_modules/@duckdb/node-bindings-*/*.dylib",
+      "./node_modules/@duckdb/node-bindings-*/*.so",
+    ],
   },
   allowedDevOrigins: ["checksum-nextjs.tuns.sh","checksum-nextjs.nue.tuns.sh"],
   // /dashboard and /flow moved under /admin. Chargebee hosted-page checkouts

@@ -12,13 +12,14 @@ locals {
 
   ecs_worker_enabled    = var.worker_runtime == "ecs"
   lambda_worker_enabled = var.worker_runtime == "lambda"
+  usage_lake_enabled    = var.usage_metrics_store == "s3"
   worker_queue_visibility_timeout_seconds = local.lambda_worker_enabled ? (
     var.worker_lambda_timeout_seconds * 6
   ) : 30
 
   # Shared env + secrets injected into every pointer container (app + migrate +
   # the ECS worker when selected).
-  container_env = [
+  container_env = concat([
     { name = "NODE_ENV", value = "production" },
     { name = "AWS_REGION", value = var.region },
     { name = "CHARGEBEE_WEBHOOK_SQS_QUEUE_URL", value = aws_sqs_queue.main.url },
@@ -30,7 +31,13 @@ locals {
     { name = "BETTER_AUTH_TRUSTED_ORIGINS", value = "https://${local.domain}" },
     { name = "CHARGEBEE_USAGE_INGEST_ENABLED", value = tostring(var.usage_ingest_enabled) },
     { name = "USAGE_FLUSH_INTERVAL_MS", value = tostring(var.usage_flush_interval_ms) },
-  ]
+    { name = "USAGE_METRICS_STORE", value = var.usage_metrics_store },
+    ], local.usage_lake_enabled ? [
+    { name = "USAGE_LAKE_BUCKET", value = aws_s3_bucket.usage[0].id },
+    { name = "USAGE_LAKE_PREFIX", value = var.usage_lake_prefix },
+    { name = "USAGE_LAKE_MEMORY_LIMIT", value = var.usage_lake_memory_limit },
+    { name = "USAGE_LAKE_THREADS", value = tostring(var.usage_lake_threads) },
+  ] : [])
 
   container_secrets = [
     {

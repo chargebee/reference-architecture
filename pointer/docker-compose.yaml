@@ -41,7 +41,7 @@ services:
     ports:
       - "4566:4566"
     environment:
-      SERVICES: sqs
+      SERVICES: sqs,s3
       DEBUG: 0
       AWS_DEFAULT_REGION: us-east-1
     volumes:
@@ -49,6 +49,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       # Creates the Chargebee webhook queue + DLQ on startup (mirrors infra/sqs.tf).
       - ./docker/localstack/init-sqs.sh:/etc/localstack/init/ready.d/init-sqs.sh
+      # Creates the local usage lake bucket (mirrors infra/s3.tf).
+      - ./docker/localstack/init-s3.sh:/etc/localstack/init/ready.d/init-s3.sh
 
 volumes:
   redis-data:

@@ -136,3 +136,32 @@ variable "usage_flush_interval_ms" {
     error_message = "usage_flush_interval_ms must be between 1000 and 600000 so events cannot age out of Chargebee's 12-hour backdating window."
   }
 }
+
+variable "usage_metrics_store" {
+  description = "Usage history store. PostgreSQL remains the default; s3 selects Hive-partitioned Parquet queried through DuckDB."
+  type        = string
+  default     = "postgres"
+
+  validation {
+    condition     = contains(["postgres", "s3"], var.usage_metrics_store)
+    error_message = "usage_metrics_store must be either \"postgres\" or \"s3\"."
+  }
+}
+
+variable "usage_lake_prefix" {
+  description = "Object prefix used by the S3 usage metrics store."
+  type        = string
+  default     = "usage"
+}
+
+variable "usage_lake_memory_limit" {
+  description = "DuckDB memory limit in the app and usage worker containers."
+  type        = string
+  default     = "256MB"
+}
+
+variable "usage_lake_threads" {
+  description = "DuckDB worker threads per app or usage worker process."
+  type        = number
+  default     = 2
+}

@@ -19,6 +19,42 @@ resource "aws_cloudwatch_log_group" "worker" {
   retention_in_days = 14
 }
 
+resource "aws_iam_role" "worker_task" {
+  count = local.ecs_worker_enabled ? 1 : 0
+
+  name               = "${local.name_prefix}-ecs-worker-role"
+  assume_role_policy = data.aws_iam_policy_document.ecs_assume_role.json
+}
+
+data "aws_iam_policy_document" "worker_sqs" {
+  count = local.ecs_worker_enabled ? 1 : 0
+
+  statement {
+    actions = [
+      "sqs:SendMessage",
+      "sqs:ReceiveMessage",
+      "sqs:DeleteMessage",
+      "sqs:GetQueueAttributes",
+      "sqs:GetQueueUrl",
+      "sqs:ChangeMessageVisibility",
+    ]
+    resources = [aws_sqs_queue.main.arn]
+  }
+
+  statement {
+    actions   = ["sqs:SendMessage"]
+    resources = [aws_sqs_queue.dlq.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "worker_sqs" {
+  count = local.ecs_worker_enabled ? 1 : 0
+
+  name   = "${local.name_prefix}-ecs-worker-sqs"
+  role   = aws_iam_role.worker_task[0].id
+  policy = data.aws_iam_policy_document.worker_sqs[0].json
+}
+
 resource "aws_ecs_task_definition" "worker" {
   count = local.ecs_worker_enabled ? 1 : 0
 
@@ -28,9 +64,7 @@ resource "aws_ecs_task_definition" "worker" {
   cpu                      = "256"
   memory                   = "512"
   execution_role_arn       = aws_iam_role.execution.arn
-  # Same task role as the app: it already scopes sqs:ReceiveMessage/DeleteMessage
-  # /ChangeMessageVisibility on the main queue and sqs:SendMessage on the DLQ.
-  task_role_arn = aws_iam_role.task.arn
+  task_role_arn            = aws_iam_role.worker_task[0].arn
 
   runtime_platform {
     cpu_architecture        = "ARM64"

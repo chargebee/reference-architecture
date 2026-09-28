@@ -28,6 +28,7 @@ pointer/infra/
 | RDS | `pointer-db` Postgres (latest default version), `db.t4g.micro`, single-AZ, encrypted at rest, TLS enforced |
 | Secrets | `pointer-db-credentials` (auto-generated DB password) and `pointer-app-secrets` (app/Chargebee secrets, populated out-of-band) |
 | SQS | `pointer-queue` + `pointer-dlq` (SSE on both, maxReceiveCount=5) |
+| Usage lake | Encrypted private S3 bucket when `usage_metrics_store = "s3"` |
 | Logs | `/ecs/pointer-app` plus `/ecs/pointer-worker` or `/aws/lambda/pointer-worker` (14-day retention) |
 
 All resources are prefixed with `pointer-` and tagged `Project=pointer`, `ManagedBy=terraform`.
@@ -44,6 +45,7 @@ All resources are prefixed with `pointer-` and tagged `Project=pointer`, `Manage
 | `worker_lambda_timeout_seconds` | `60` | Lambda timeout; queue visibility becomes 6x this value |
 | `worker_lambda_batch_size` | `10` | Records per Lambda invocation |
 | `worker_lambda_max_concurrency` | `2` | Event-source and reserved concurrency cap |
+| `usage_metrics_store` | `postgres` | Set to `s3` to provision and use the DuckDB/Parquet usage lake |
 
 The ECS-specific `worker_*` scaling variables remain available when
 `worker_runtime = "ecs"`. See [variables.tf](variables.tf) for the full list.

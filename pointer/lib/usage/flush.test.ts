@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
 	batchIngest: vi.fn(),
@@ -17,7 +17,11 @@ vi.mock("@/plugins/chargebee-plugin", () => ({
 
 vi.mock("@/lib/events/emit", () => ({ emit: vi.fn() }));
 
-vi.mock("./store", () => ({ recordUsageBatch: mocks.recordUsageBatch }));
+vi.mock("./store", () => ({
+	getUsageMetricsStore: vi.fn().mockResolvedValue({
+		recordBatch: mocks.recordUsageBatch,
+	}),
+}));
 
 vi.mock("./stream", () => ({
 	readUsageBatch: mocks.readUsageBatch,

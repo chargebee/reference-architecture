@@ -1,8 +1,12 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ readUsageSeries: vi.fn() }));
 
-vi.mock("./store", () => ({ readUsageSeries: mocks.readUsageSeries }));
+vi.mock("./store", () => ({
+	getUsageMetricsStore: vi.fn().mockResolvedValue({
+		readSeries: mocks.readUsageSeries,
+	}),
+}));
 
 import { fetchUsageSummary, isUsageWindow, snapToWindow } from "./summary";
 

@@ -1,5 +1,5 @@
 /**
- * The batch pump: drain the usage buffer into Postgres and Chargebee.
+ * The batch pump: drain the usage buffer into the metrics store and Chargebee.
  *
  *   reclaim stale ─▶ read new ─▶ archive ─▶ drop expired ─▶ ingest ─▶ ack
  *                                              │             │
@@ -21,21 +21,21 @@
 import { emit } from "@/lib/events/emit";
 
 import {
-	MAX_DELIVERIES,
 	ingestBatch,
+	MAX_DELIVERIES,
 	splitExhausted,
 	splitExpired,
 } from "./ingest";
+import { getUsageMetricsStore } from "./store";
 import {
 	ackUsageEvents,
 	deadLetterUsageEvents,
 	ensureConsumerGroup,
 	readUsageBatch,
 	reclaimStale,
-	usageStreamDepth,
 	type UsageStreamEntry,
+	usageStreamDepth,
 } from "./stream";
-import { recordUsageBatch } from "./store";
 
 /**
  * How long an entry may sit unacknowledged before another worker takes it.
@@ -78,11 +78,12 @@ export async function flushUsage(consumer: string): Promise<FlushResult> {
 	const collected = await collect(consumer);
 	if (!collected.length) return EMPTY;
 
-	// Archived before the Chargebee splits, so history keeps the events Chargebee
+	// Stored before the Chargebee splits, so history keeps the events Chargebee
 	// refuses on age. A failure here throws: nothing is acknowledged, no batch is
 	// ingested, and the next pass reclaims the whole lot. History is the read path
 	// now, so a silent gap would be visible to the subscriber.
-	await recordUsageBatch(collected.map((entry) => entry.event));
+	const store = await getUsageMetricsStore();
+	await store.recordBatch(collected.map((entry) => entry.event));
 
 	// Chargebee will never accept these, and retrying only wastes attempts.
 	const { fresh, expired } = splitExpired(collected);

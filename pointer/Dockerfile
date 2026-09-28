@@ -26,7 +26,17 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1 \
-    NODE_ENV=production
+    NODE_ENV=production \
+    DUCKDB_EXTENSION_DIRECTORY=/app/.duckdb/extensions
+
+# Keep S3 startup independent of extensions.duckdb.org at runtime.
+RUN node --input-type=module -e "\
+  import { DuckDBInstance } from '@duckdb/node-api'; \
+  const db = await DuckDBInstance.create(':memory:'); \
+  const connection = await db.connect(); \
+  await connection.run(\"SET extension_directory = '/app/.duckdb/extensions'; INSTALL aws; INSTALL httpfs;\"); \
+  connection.closeSync(); \
+  db.closeSync();"
 
 RUN pnpm build
 
@@ -53,6 +63,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
+    DUCKDB_EXTENSION_DIRECTORY=/app/.duckdb/extensions \
     PORT=3000 \
     HOSTNAME=0.0.0.0
 
@@ -65,6 +76,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 # Static assets and public files (served by the standalone server when colocated).
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public      ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.duckdb     ./.duckdb
 
 USER nextjs
 EXPOSE 3000

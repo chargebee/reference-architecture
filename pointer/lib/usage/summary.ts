@@ -1,5 +1,5 @@
 /**
- * Buffered usage read back as a time series, from the local archive.
+ * Buffered usage read back as a time series from the configured metrics store.
  *
  * This is a reporting surface, never an enforcement one. Events land here a
  * batch behind the flush interval, so quota decisions stay with the Redis
@@ -11,7 +11,7 @@
  * Chargebee is still the billing system of record and still receives every
  * event, but its API quota is a billing budget. A subscriber refreshing this
  * page several times a day would spend it on reporting. `store.ts` aggregates
- * the same events out of Postgres instead, at no external cost.
+ * the same events out of the deployment's metrics store instead.
  *
  * # Window alignment
  *
@@ -23,9 +23,13 @@
 
 import { meteredFeatureFor, type UsageMetric } from "@/scripts/catalog";
 
-import { readUsageSeries, type UsageBucket } from "./store";
+import {
+	getUsageMetricsStore,
+	type UsageBucket,
+	type UsageWindow,
+} from "./store";
 
-export type UsageWindow = "hour" | "day" | "week" | "month";
+export type { UsageWindow } from "./store";
 
 const WINDOWS: UsageWindow[] = ["hour", "day", "week", "month"];
 
@@ -139,8 +143,9 @@ export async function fetchUsageSummary(
 ): Promise<UsageSummarySeries> {
 	const feature = meteredFeatureFor(query.metric);
 	const from = snapToWindow(query.from, query.window);
+	const store = await getUsageMetricsStore();
 
-	const buckets = await readUsageSeries({
+	const buckets = await store.readSeries({
 		subscriptionId: query.subscriptionId,
 		metric: query.metric,
 		window: query.window,

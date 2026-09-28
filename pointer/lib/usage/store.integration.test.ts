@@ -4,7 +4,7 @@ import { getPool } from "@/lib/db";
 
 import type { BufferedUsageEvent } from "./events";
 import { applyUsageSchema } from "./partitions";
-import { readUsageSeries, recordUsageBatch } from "./store";
+import { PostgresUsageMetricsStore } from "./postgres-store";
 import { snapToWindow } from "./summary";
 import process from "node:process";
 
@@ -16,6 +16,7 @@ const WEEK_MS = 7 * 24 * HOUR_MS;
 
 postgresTests("usage archive", () => {
 	const subscriptionId = `test-${process.pid}-${Date.now()}`;
+	const store = new PostgresUsageMetricsStore();
 	/** Monday 00:00 UTC of the current ISO week — a provisioned partition. */
 	const weekStart = snapToWindow(new Date(), "week");
 
@@ -68,7 +69,7 @@ postgresTests("usage archive", () => {
 	});
 
 	it("routes events into the partition for their week", async () => {
-		await recordUsageBatch([
+		await store.recordBatch([
 			event("this-week", new Date(weekStart.getTime() + 6 * HOUR_MS)),
 			event("next-week", new Date(weekStart.getTime() + WEEK_MS + 6 * HOUR_MS)),
 		]);
@@ -86,7 +87,7 @@ postgresTests("usage archive", () => {
 	it("parks an event beyond the provisioned weeks in the default partition", async () => {
 		// The scheduler only runs a fortnight ahead; nothing should ever fail to
 		// land, even when it is late.
-		await recordUsageBatch([
+		await store.recordBatch([
 			event("far-future", new Date(weekStart.getTime() + 52 * WEEK_MS)),
 		]);
 
@@ -102,8 +103,8 @@ postgresTests("usage archive", () => {
 			}),
 		];
 
-		await recordUsageBatch(replayed);
-		await recordUsageBatch(replayed);
+		await store.recordBatch(replayed);
+		await store.recordBatch(replayed);
 
 		const pool = await getPool();
 		const result = await pool.query<{ count: string }>(
@@ -118,7 +119,7 @@ postgresTests("usage archive", () => {
 
 	it("sums a metric into the requested buckets", async () => {
 		const day = new Date(weekStart.getTime() + 24 * HOUR_MS);
-		await recordUsageBatch([
+		await store.recordBatch([
 			event("agg-a", new Date(day.getTime() + 1 * HOUR_MS), {
 				input: 100,
 				credits: 0.25,
@@ -137,14 +138,14 @@ postgresTests("usage archive", () => {
 			limit: 100,
 		};
 
-		const daily = await readUsageSeries({
+		const daily = await store.readSeries({
 			...query,
 			metric: "input_tokens",
 			window: "day",
 		});
 		expect(daily).toEqual([{ from: day, value: 157 }]);
 
-		const hourly = await readUsageSeries({
+		const hourly = await store.readSeries({
 			...query,
 			metric: "input_tokens",
 			window: "hour",
@@ -155,14 +156,14 @@ postgresTests("usage archive", () => {
 		]);
 
 		// Stored as milli-credits, reported as credits.
-		const credits = await readUsageSeries({
+		const credits = await store.readSeries({
 			...query,
 			metric: "credits_consumed",
 			window: "day",
 		});
 		expect(credits).toEqual([{ from: day, value: 0.5 }]);
 
-		const generations = await readUsageSeries({
+		const generations = await store.readSeries({
 			...query,
 			metric: "generations",
 			window: "day",

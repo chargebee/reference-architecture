@@ -15,7 +15,8 @@ flowchart TB
       App["pointer-app<br/>(Next.js 16 + Better Auth)"]
       Worker["pointer-worker<br/>(SQS Consumer + Usage Loop)"]
       Queue[["AWS SQS<br/>(Main Queue + DLQ)"]]
-      PG[("PostgreSQL 18<br/>(Mirror & Archive)")]
+      PG[("PostgreSQL 18<br/>(Mirror & Default Usage Store)")]
+      S3[("S3 Parquet<br/>(Optional Usage Store)")]
       Redis[("Redis 8<br/>(Cache, Counters & Streams)")]
   end
 
@@ -34,10 +35,12 @@ flowchart TB
   CB -->|Webhook events| App
   App -->|Enqueue webhooks| Queue
   Queue -->|Consume events| Worker
-  Worker -->|Sync billing & archive usage| PG
+  Worker -->|Sync billing & store usage by default| PG
+  Worker -.->|Store usage when configured| S3
   Worker -->|Batch ingest usage| CB
   App -->|Stream generation| OR
   App <-->|App state & billing mirror| PG
+  App -.->|Query usage when configured| S3
   App <-->|Quota checks & usage buffer| Redis
   Worker <-->|Drain buffer & emit events| Redis
 ```
@@ -51,7 +54,8 @@ flowchart TB
 | Auth | **Better Auth** | Email/password, 2FA, bearer tokens, organizations, admin |
 | Billing | **Chargebee** + [@chargebee/better-auth](https://npmx.dev/@chargebee/better-auth) plugin | Customer/subscription lifecycle and webhook sync |
 | Model Provider | **OpenRouter** + `@openrouter/ai-sdk-provider` | External streaming text generation provider |
-| Primary DB | **PostgreSQL 18** (via `pg` + Kysely) | Users, sessions, orgs, subscription mirror, usage archive |
+| Primary DB | **PostgreSQL 18** (via `pg` + Kysely) | Users, sessions, orgs, subscription mirror, default usage metrics store |
+| Usage lake | **S3 Parquet** + embedded **DuckDB** (optional) | Scalable usage metrics store selected per deployment |
 | Cache + streams | **Redis 8** (`ioredis`) | Idempotency helpers, usage counters, the usage-event buffer, and the live event stream |
 | Async Queue | **AWS SQS** (+ DLQ), `sqs-consumer` | Buffers Chargebee webhooks for the worker |
 | Background jobs | Standalone Node process (`tsx`) | Consumes SQS and applies DB sync |
@@ -103,11 +107,11 @@ parse → stale/duplicate guard → dependency pre-check → process
   item rows, the same queue receives a job for its entitlement snapshot. Jobs skip the webhook
   pipeline, since there is no additional Chargebee event to order or verify, but reuse the
   backoff and DLQ.
-- **Usage flush** — a second loop drains the Redis usage buffer into Postgres and then
+- **Usage flush** — a second loop drains the Redis usage buffer into the configured metrics store and then
   Chargebee, up to 500 events per pass (Chargebee's batch ceiling). Both sinks are fed from
   one pass rather than a second consumer group, because settling an entry deletes it from the
   stream: whichever group acknowledged first would take it away from the other. A failed
-  Postgres write abandons the pass without acknowledging anything, since history is the read
+  metrics-store write abandons the pass without acknowledging anything, since history is the read
   path and a silent gap would be visible to the subscriber. It rides this process rather than
   a service of its own: the work is a periodic drain and this is already a long-running task in the VPC
   with a Redis connection. Redis consumer groups spread entries across however many tasks
@@ -132,6 +136,11 @@ See [`docs/plans/5-webhook-correctness.md`](docs/plans/5-webhook-correctness.md)
   at-least-once replay a no-op — so the write path pays for exactly one index. The CLI cannot
   express partitioning, so `lib/usage/partitions.ts` owns that DDL while
   `plugins/usage-plugin.ts` keeps the columns under CLI management.
+- **S3 usage lake** — setting `USAGE_METRICS_STORE=s3` replaces the PostgreSQL
+  usage archive with Parquet files queried by embedded DuckDB. Files are Hive
+  partitioned by subscription and UTC day; reads target one subscriber prefix
+  and deduplicate at-least-once replays by event ID. This is a deployment
+  switch, not dual writing, so existing history is not copied between stores.
 - **Redis** — hosts the Redis-Streams event bus for the live flow view, the quota and rate
   counters, and the usage-event buffer awaiting its next Chargebee batch. The event bus is a
   best-effort observation tap: if it is down, publishing fails silently and the caller is
@@ -164,6 +173,8 @@ flowchart TB
     end
     AppSvc --> RDS[("RDS Postgres<br/>encrypted, TLS")]
     WorkerSvc --> RDS
+    AppSvc -.-> S3[("S3 usage lake<br/>optional")]
+    WorkerSvc -.-> S3
     AppSvc --> SQS[["SQS queue + DLQ"]]
     WorkerSvc --> SQS
     Secrets["Secrets Manager<br/>db + app secrets"] -.-> AppSvc
@@ -177,7 +188,7 @@ flowchart TB
 | **Edge** | ALB (HTTPS only, HTTP→HTTPS redirect); Route53 alias to `pointer.chargebee-labs.com`; ACM cert looked up |
 | **Compute** | ECS Fargate cluster with `pointer-app` (web), `pointer-worker` (webhook consumer), and a short-lived `pointer-app-migrate` task |
 | **Images** | ECR repo `pointer-app`; a slim standalone `:latest` for the app, a `builder` image for worker + migrations |
-| **Data** | RDS Postgres (`db.t4g.micro`, single-AZ, encrypted at rest, TLS enforced) |
+| **Data** | RDS Postgres (`db.t4g.micro`, single-AZ, encrypted at rest, TLS enforced); optional encrypted S3 usage lake |
 | **Async** | SQS main queue + DLQ (SSE on both, `maxReceiveCount=5`) |
 | **Secrets** | Secrets Manager holds DB credentials and app/Chargebee secrets, injected into tasks at start |
 | **Logs** | CloudWatch log groups per service (14-day retention) |

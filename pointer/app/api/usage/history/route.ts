@@ -16,7 +16,7 @@ import { meteredFeatures, type UsageMetric } from "@/scripts/catalog";
  * Sibling of `../route.ts`, which answers "where am I against my limits right
  * now" from the Redis counters. This one answers "what did I use over time",
  * which the counters cannot, because they reset each period. It reads the
- * archive in Postgres, not Chargebee — see `lib/usage/summary.ts`.
+ * configured metrics store, not Chargebee — see `lib/usage/store.ts`.
  *
  * One metric per request, mirroring the metered features one-for-one, so a
  * two-series chart is two requests.
