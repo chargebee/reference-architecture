@@ -9,18 +9,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RetryableWebhookError } from "@/lib/webhooks/webhook-errors";
 
 const mocks = vi.hoisted(() => ({
-	assertDependencies: vi.fn(async () => undefined),
-	assertProcessed: vi.fn(async () => undefined),
-	commitVersions: vi.fn(async () => undefined),
 	emit: vi.fn(async () => undefined),
-	isEventStale: vi.fn(async () => false),
 	pluginProcess: vi.fn(async () => undefined),
-	processEntitlementWebhook: vi.fn(async () => false),
+	runPipeline: vi.fn(async () => "processed-standard"),
 	runEntitlementSyncJob: vi.fn(async () => undefined),
-	sqsSend: vi.fn(async (command: unknown) => {
-		void command;
-		return {};
-	}),
+	sqsSend: vi.fn(async (_command: unknown) => ({})),
 }));
 
 vi.mock("@chargebee/better-auth", () => ({
@@ -34,17 +27,13 @@ vi.mock("@/lib/auth", () => ({
 	},
 }));
 vi.mock("@/lib/entitlements/sync", () => ({
-	processEntitlementWebhook: mocks.processEntitlementWebhook,
 	runEntitlementSyncJob: mocks.runEntitlementSyncJob,
 }));
 vi.mock("@/lib/events/emit", () => ({
 	emit: mocks.emit,
 }));
-vi.mock("@/lib/webhooks/webhook-guards", () => ({
-	assertDependencies: mocks.assertDependencies,
-	assertProcessed: mocks.assertProcessed,
-	commitVersions: mocks.commitVersions,
-	isEventStale: mocks.isEventStale,
+vi.mock("@/lib/webhooks/chargebee-event-pipeline", () => ({
+	runChargebeeEventPipeline: mocks.runPipeline,
 }));
 vi.mock("@/plugins/chargebee-plugin", () => ({
 	chargebeePluginOptions: {},
@@ -73,39 +62,32 @@ function createProcessor() {
 	});
 }
 
-describe("Chargebee webhook message processor", () => {
-	beforeEach(() => {
-		vi.clearAllMocks();
-		mocks.assertDependencies.mockResolvedValue(undefined);
-		mocks.assertProcessed.mockResolvedValue(undefined);
-		mocks.commitVersions.mockResolvedValue(undefined);
-		mocks.emit.mockResolvedValue(undefined);
-		mocks.isEventStale.mockResolvedValue(false);
-		mocks.pluginProcess.mockResolvedValue(undefined);
-		mocks.processEntitlementWebhook.mockResolvedValue(false);
-		mocks.runEntitlementSyncJob.mockResolvedValue(undefined);
-		mocks.sqsSend.mockResolvedValue({});
-	});
+beforeEach(() => {
+	vi.clearAllMocks();
+	mocks.emit.mockResolvedValue(undefined);
+	mocks.pluginProcess.mockResolvedValue(undefined);
+	mocks.runPipeline.mockResolvedValue("processed-standard");
+	mocks.runEntitlementSyncJob.mockResolvedValue(undefined);
+	mocks.sqsSend.mockResolvedValue({});
+});
 
-	it("runs the complete webhook correctness pipeline", async () => {
+describe("Chargebee event dispatch", () => {
+	it("dispatches Chargebee events to the domain pipeline", async () => {
 		const processMessage = createProcessor();
+		const event = {
+			id: "event-1",
+			event_type: "subscription_changed",
+			occurred_at: 123,
+			content: {},
+		};
 
-		await processMessage(
-			message(
-				JSON.stringify({
-					id: "event-1",
-					event_type: "subscription_changed",
-					occurred_at: 123,
-					content: {},
-				}),
-			),
+		await processMessage(message(JSON.stringify(event)));
+
+		expect(mocks.runPipeline).toHaveBeenCalledWith(
+			event,
+			{ process: mocks.pluginProcess },
+			{ sqsMessageId: "message-1" },
 		);
-
-		expect(mocks.assertDependencies).toHaveBeenCalledTimes(1);
-		expect(mocks.pluginProcess).toHaveBeenCalledTimes(1);
-		expect(mocks.assertProcessed).toHaveBeenCalledTimes(1);
-		expect(mocks.processEntitlementWebhook).toHaveBeenCalledTimes(1);
-		expect(mocks.commitVersions).toHaveBeenCalledTimes(1);
 	});
 
 	it("routes malformed bodies to the DLQ without retrying", async () => {
@@ -121,10 +103,12 @@ describe("Chargebee webhook message processor", () => {
 			MessageBody: "{invalid",
 		});
 	});
+});
 
+describe("Chargebee message failure handling", () => {
 	it("backs off and rethrows retryable failures", async () => {
 		const processMessage = createProcessor();
-		mocks.assertDependencies.mockRejectedValueOnce(
+		mocks.runPipeline.mockRejectedValueOnce(
 			new RetryableWebhookError("dependency not ready"),
 		);
 
@@ -164,8 +148,7 @@ describe("Chargebee webhook message processor", () => {
 		await processMessage(message(JSON.stringify(job)));
 
 		expect(mocks.runEntitlementSyncJob).toHaveBeenCalledWith(job);
-		expect(mocks.isEventStale).not.toHaveBeenCalled();
-		expect(mocks.pluginProcess).not.toHaveBeenCalled();
+		expect(mocks.runPipeline).not.toHaveBeenCalled();
 	});
 });
 
