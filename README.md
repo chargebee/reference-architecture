@@ -1,6 +1,6 @@
 # Chargebee Reference Architecture
 
-**Status**: This is a work in progress - please expect continuous updates until it's marked ready for public consumption.
+**Status**: This is a work in progress. Please expect continuous updates until it is marked ready for public consumption.
 
 ---
 
@@ -10,45 +10,45 @@
   <img alt="Chargebee Reference Architecture" src="./pointer/public/banner-light.svg" width="680">
 </picture>
 
-The purpose of this repository is to showcase the best practices around integrating Chargebee as the billing solution for a high-traffic AI/SaaS platform. This is split into two distinct parts:
+The purpose of this repository is to showcase best practices for integrating Chargebee as the billing solution for a high-traffic AI/SaaS platform. It is split into two distinct parts:
 
-- A collection of in-depth, technical how-tos which cover the Chargebee recommended best practices when integrating various billing and usage related Chargebee products
+- A collection of in-depth, technical how-tos covering Chargebee-recommended best practices for integrating various billing- and usage-related Chargebee products
 
-- An opinionated, fully functional and deployable application built to demonstrate how these concepts translate to code
+- An opinionated, fully functional, and deployable application built to demonstrate how these concepts translate into code
 
 ## Audience
 
-- Architects and solution consultants who are looking for Chargebee's recommended practices when integrating our products with their platform
+- Architects and solution consultants looking for Chargebee's recommended practices when integrating Chargebee products with their platforms
 
-- Developers who are looking to validate their integration code and ensure all edge-cases are covered
+- Developers looking to validate their integration code and ensure all edge cases are covered
 
-- LLMs and coding agents looking for authoritative sources for integrating Chargebee which are generalized and can be used to produce a working implementation using any tech stack
+- LLMs and coding agents looking for authoritative sources for integrating Chargebee that are generalized and can be used to produce a working implementation using any tech stack
 
 ## What it covers
 
-The topics below cover the best practices to achieve the required outcome and are vetted and updated continuously. They cover implementation details, edge cases to handle, testing scenarios, etc. To bridge the gap between documentation and implementation, each of these topics is actually implemented in code. The [Pointer](./pointer/README.md) app is our demo application built with an opinionated tech stack with all the required pieces to spin up a working SaaS platform. 
+The topics below cover best practices to achieve the required outcome and are vetted and updated continuously. They cover implementation details, edge cases to handle, and testing scenarios. To bridge the gap between documentation and implementation, each topic is implemented in code. The [Pointer](./pointer/README.md) app is our demo application, built with an opinionated tech stack and all the components needed to spin up a working SaaS platform.
 
-Regardless of your tech stack or hosting platform, each how-to covers the functional/non-functional requirements and a production go-live checklist to help you along the journey.
+Regardless of your tech stack or hosting platform, each how-to covers functional and non-functional requirements alongside a production go-live checklist.
 
-Each how-to is broken down into self-contained topics that addresses a specific scenario. It can include:
+Each how-to is broken down into self-contained topics that address a specific scenario. Each guide can include:
 
 - Architecture or flow diagrams
 
 - Pseudocode showing how certain cases may be structured in code
 
-- Best practices to keep in mind, and testing scenarios which are useful in validating your implementation
+- Best practices to keep in mind, and testing scenarios useful for validating your implementation
 
 - Do's and Don'ts
 
-- An overview of how that topic is implemented in the demo app along with the relevant source files to look at
+- An overview of how that topic is implemented in the demo app along with the relevant source files to review
 
-- A go-live checklist of must-do steps to pay attention to before your app gets deployed to production environments
+- A go-live checklist of key requirements to verify before your app gets deployed to production environments
 
-These topics are written in plain Markdown with mermaid diagrams wherever possible. They are written and edited by humans, but can be consumed by agents as well.
+These topics are written in plain Markdown with Mermaid diagrams wherever possible. They are written and edited by humans, but can be consumed by agents as well.
 
 ## Where it fits in
 
-While the Chargebee [docs](https://chargebee.com/docs) and [apidocs](https://apidocs.chargebee.com) serve as the main source of reference from the product and engineering teams, they aren't structured for consuming topics in thin vertical slices - something the content in this repo aims to do.
+While the Chargebee [docs](https://chargebee.com/docs) and [apidocs](https://apidocs.chargebee.com) serve as the main source of reference from the product and engineering teams, they are not structured for consuming topics in thin vertical slices, which is what this repository provides.
 
 ![information architecture](./pointer/public/information-architecture.png)
 
@@ -59,8 +59,7 @@ While the Chargebee [docs](https://chargebee.com/docs) and [apidocs](https://api
 | [Integrating Chargebee webhooks](./how-to/webhooks.md) | In Review | |
 | [Enforcing entitlement checks](./how-to/entitlement-checks.md) | In Review | |
 | [Sync Chargebee entities](./how-to/sync-chargebee-entities.md) | Draft | |
-| [Usage based billing](./how-to/usage-based-billing.md) | Draft | |
-
+| [Usage-based billing](./how-to/usage-based-billing.md) | Draft | |
 
 ## Reference App
 
@@ -70,12 +69,11 @@ While the Chargebee [docs](https://chargebee.com/docs) and [apidocs](https://api
   </a>
 </p>
 
-[Pointer](https://pointer.chargebee-labs.com) is our reference app which mimics an LLM/AI API provider that is PLG (product-led growth) driven. A developer signs up, uses their daily token allowance, and upgrades to Pro to keep going. Chargebee handles the subscription, entitlements, usage tracking and alerts.
+[Pointer](https://pointer.chargebee-labs.com) is our reference app, which models an LLM/AI API provider driven by product-led growth (PLG). A developer signs up, uses their daily token allowance, and upgrades to Pro to keep going. Chargebee handles subscriptions, entitlements, usage tracking, and alerts.
 
-It was built from the ground up with the help of coding agents and Chargebee's official libraries and SDK. Although a considerable amount of code was generated via LLMs, the architecture and design of the app, and the how-to topics themselves are completely written and reviewed by humans.
+It was built from the ground up with the help of coding agents and Chargebee's official libraries and SDKs. Although a considerable amount of code was generated via LLMs, the architecture and design of the app and the how-to topics themselves are completely written and reviewed by humans.
 
-The purpose of building Pointer along with the how-to topics is to ensure that they cover practical aspects of integrating Chargebee with a monetizable product. 
-We aim to continuously evolve and expand the reference architecture as we build out Pointer with additional features - this mimics how an actual product team would go about integrating billing, subscription, entitlement, and usage management into their app.
+Building Pointer alongside the how-to topics ensures they cover the practical aspects of integrating Chargebee with a monetizable product. We aim to continuously evolve and expand the reference architecture as we build out Pointer with additional features; this mimics how an actual product team integrates billing, subscription, entitlement, and usage management into their app.
 
 A high-level overview of the Pointer architecture is shown below. Further details on the tech stack, components, and infrastructure are provided in [ARCHITECTURE.md](./pointer/ARCHITECTURE.md).
 
