@@ -149,7 +149,7 @@ flowchart LR
 
   CB -->|1. POST webhook event| Endpoint
   Endpoint -->|2. Validate & enqueue payload| Queue
-  Endpoint -->|3. Return 200 OK (~30ms)| CB
+  Endpoint -->|3. Return 200 OK | CB
 ```
 
 ### 4.3 Asynchronous Webhook Processing Flow
