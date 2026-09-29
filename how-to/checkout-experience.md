@@ -1,6 +1,6 @@
 # How To Build A Checkout Experience
 
-Integrating checkout requires balancing customer convenience with billing security. The frontend must guide users through plan selection and payment smoothly, while your server retains strict control over pricing, plan eligibility, and order fulfillment.
+Integrating checkout requires balancing customer convenience with billing security. The frontend guides users through plan selection and payment, while your server retains control over pricing, plan eligibility, and order fulfillment.
 
 This guide covers how to:
 
@@ -14,20 +14,20 @@ Chargebee is the system of record for subscriptions, customer balances, and invo
 
 ## Setup
 
-- Product Catalog 2.0 with items, item prices, currencies, and tax rules configured
-- At least one payment gateway and required payment methods active in Chargebee
-- Checkout branding, fields, and return URLs published under **Settings > Configure Chargebee > Checkout & Self-Serve Portal**
-- Publishable API key when using Chargebee.js Payment Components
-- HTTPS webhook endpoint and background queue worker (see [webhook integration](./webhooks.md))
-- For mobile app purchases, an Apple or Google app connected to [Omnichannel Subscriptions](https://www.chargebee.com/docs/billing/2.0/mobile-subscriptions/omnichannel-subscription-overview)
+* Product Catalog 2.0 with items, item prices, currencies, and tax rules configured
+* At least one payment gateway and required payment methods active in Chargebee
+* Checkout branding, fields, and return URLs published under **Settings > Configure Chargebee > Checkout & Self-Serve Portal**
+* Publishable API key when using Chargebee.js Payment Components
+* HTTPS webhook endpoint and background queue worker (see [webhook integration](./webhooks.md))
+* For mobile app purchases, an Apple or Google app connected to [Omnichannel Subscriptions](https://www.chargebee.com/docs/billing/2.0/mobile-subscriptions/omnichannel-subscription-overview)
 
 ## 1. Choose The Checkout Experience
 
-Chargebee supports three main checkout models depending on your platform and user interface needs:
+Chargebee supports three checkout models depending on your platform and user interface needs:
 
 | Model | Best for | UI owner | PCI compliance |
 |:---|:---|:---|:---|
-| Hosted Checkout | Standard web apps, fast setup, maximum payment method support | Chargebee (modal or full-page) | Handled by Chargebee (SAQ A) |
+| Hosted Checkout | Standard web apps, fast setup, broad payment method support | Chargebee (modal or full-page) | Handled by Chargebee (SAQ A) |
 | Payment Components | Web apps requiring an embedded, fully custom design | Your application, with Chargebee iframes | Handled by Chargebee iframes (SAQ A) |
 | Native In-App Purchases | iOS and Android apps selling digital products | Native store UI (StoreKit / Play Billing) | Handled by Apple / Google |
 
@@ -41,11 +41,11 @@ flowchart TD
   E -->|No| G[Hosted Checkout in mobile browser]
 ```
 
-Most web applications should use [Hosted Checkout](https://www.chargebee.com/docs/billing/2.0/hosted-capabilities/hosted-checkout). It manages order previews, tax calculation, 3D Secure challenges, mobile wallets, and regional direct debits without custom billing UI.
+Most web applications should use [Hosted Checkout](https://www.chargebee.com/docs/billing/2.0/hosted-capabilities/hosted-checkout). It manages order previews, tax calculation, 3D Secure challenges, mobile wallets, and regional payment methods without custom billing UI.
 
-Use [Payment Components](https://www.chargebee.com/docs/payments/2.0/payment-components/overview) when the hosted layouts cannot fit your design system. Your backend must then coordinate pricing estimates, Payment Intents, and asynchronous order creation.
+Use [Payment Components](https://www.chargebee.com/docs/payments/2.0/payment-components/overview) when hosted layouts cannot fit your design system. Your backend must then coordinate pricing estimates, Payment Intents, and asynchronous order creation.
 
-For native mobile apps selling digital features, store policies require using Apple In-App Purchase or Google Play Billing. Complete the transaction in the mobile app, then record the receipt in Chargebee.
+For native mobile apps selling digital goods, store policies require using Apple In-App Purchase or Google Play Billing. Complete the transaction in the mobile app, then record the receipt in Chargebee.
 
 ✅ Do: Validate customer identity, plan eligibility, and discounts on your backend before initiating checkout.
 
@@ -53,18 +53,17 @@ For native mobile apps selling digital features, store policies require using Ap
 
 ## 2. Implement Hosted Checkout
 
-Hosted Checkout provides a prebuilt payment flow that collects account, address, and payment information, authorizes the charge, and updates the subscription.
+Hosted Checkout provides a prebuilt payment flow that collects customer details, authorizes the charge, and updates the subscription.
 
-### Choose A Layout
+### Layout Options And Constraints
 
-Chargebee provides two hosted layouts:
+* **In-app modal:** Opens as an overlay modal inside your web page. It supports all Chargebee payment methods and maintains application context. Chargebee.js manages the modal iframe automatically.
+* **Full-page redirect:** Opens as a standalone page on your Chargebee domain. It supports embedded containers, product images, and rich HTML descriptions.
 
-* **In-App layout:** Opens as an overlay modal inside your web page. It supports all Chargebee payment methods and maintains your application context. Chargebee.js creates and manages the modal iframe automatically.
-* **Full-Page layout:** Opens as a standalone page on your Chargebee subdomain or custom domain. It supports embedded checkout in a container, product images, and rich HTML descriptions, with a curated set of payment methods.
+Two operational constraints govern these layouts:
 
-Do not wrap an in-app checkout URL inside your own iframe tag. The modal is already an iframe, and nesting it breaks mobile viewports and payment redirects. If you want embedded checkout inside your page layout, use the full-page layout mounted via Chargebee.js.
-
-Redirect-based payment methods (including PayPal, GoCardless, and Plaid) require `embed: false` because bank authorization pages cannot run inside an embedded iframe. Check the [layout comparison](https://www.chargebee.com/docs/billing/2.0/hosted-capabilities/in-app-vs-full-page-checkout) before enabling payment options.
+1. **Nested iframe restriction:** Do not wrap an in-app checkout URL inside your own iframe tag. The modal is already an iframe, and nesting it breaks mobile viewports, sandbox permissions, and payment redirects.
+2. **Redirect payment methods:** Payment methods that require top-level redirects (such as PayPal, GoCardless, and Plaid) fail inside embedded iframes. They require `embed: false` or a full-page layout.
 
 ```mermaid
 sequenceDiagram
@@ -120,7 +119,7 @@ const { hosted_page: hostedPage } =
 return Response.json(hostedPage);
 ```
 
-For upgrades on existing subscriptions, call `checkoutExistingForItems`. Pass `replace_items_list: true` when switching plans, because the default behavior appends new items to the subscription.
+For upgrades on existing subscriptions, call `checkoutExistingForItems`. In Product Catalog 2.0, `replace_items_list` defaults to `false`. You must pass `replace_items_list: true` when switching plans, or Chargebee appends the new item to the subscription alongside the old one.
 
 ```typescript
 // Browser: launch hosted checkout with Chargebee.js
@@ -147,15 +146,15 @@ chargebee.openCheckout({
 });
 ```
 
-Always trigger `openCheckout` directly from a user gesture (such as clicking a button). Mobile Safari and Chrome can block popups that launch asynchronously without a direct user interaction.
+To prevent mobile Safari and Chrome from blocking checkout popups, trigger `openCheckout` synchronously from a direct user tap or click. Passing a promise callback directly to `hostedPage` lets Chargebee open the modal window immediately while the network request resolves.
 
-✅ Do: Pass a unique, stable idempotency key in the `chargebee-idempotency-key` header when creating hosted pages.
+✅ Do: Pass `replace_items_list: true` on `checkoutExistingForItems` when swapping plans.
 
-⚠️ Don't: Rely on client return parameters alone to unlock accounts. Always verify the hosted page status on your backend.
+⚠️ Don't: Rely on client return query parameters alone to grant paid access. Always verify the hosted page status on your backend.
 
 ## 3. Build A Custom Checkout With Payment Components
 
-[Payment Components](https://www.chargebee.com/docs/payments/2.0/payment-components/overview) render secure payment fields inside an iframe hosted on Chargebee's domain. Your application owns the surrounding checkout UI, while card details bypass your servers completely.
+[Payment Components](https://www.chargebee.com/docs/payments/2.0/payment-components/overview) render secure payment fields inside an iframe hosted on Chargebee's domain. Your application owns the surrounding checkout layout, while card details bypass your servers.
 
 Payment Components replace the deprecated Card Components and Payment Method Helpers. New custom checkouts should use Payment Components. Verify that your payment gateway supports Payment Intents for the methods you plan to offer.
 
@@ -184,13 +183,13 @@ sequenceDiagram
 
 ### Flow
 
-1. The customer reviews their cart and enters their billing address.
+1. The customer selects a plan and enters their billing address.
 2. Your backend calls Chargebee's estimate API to compute taxes, discounts, and the final total.
-3. Your backend creates a `payment_intent` for that amount and stores the checkout attempt in your database.
+3. Your backend creates a `payment_intent` for that amount and stores the checkout attempt locally.
 4. The browser loads Chargebee.js with your publishable key, creates the payment component with the Payment Intent ID, and mounts it into a DOM container.
-5. The customer enters their details and submits the form.
+5. The customer submits payment details.
 6. The frontend calls `paymentComponent.validate()`, followed by `paymentComponent.confirm()`. The component manages card tokenization and 3D Secure challenges inside its iframe.
-7. When authorization succeeds, the component fires `onSuccess`. The UI switches to a processing state.
+7. When authorization succeeds, the component fires `onSuccess`. The UI switches to a processing screen.
 8. Chargebee delivers a `payment_intent_updated` webhook with status `authorized`. Your backend worker verifies the intent and calls `subscription.createWithItems` to activate the subscription.
 
 ```typescript
@@ -263,17 +262,17 @@ const result = await chargebee.subscription.createWithItems(
 await db.checkoutAttempts.markCompleted(attempt.id, result.subscription.id);
 ```
 
-Use separate idempotency keys for creating the Payment Intent and creating the subscription. Reusing the same key across different endpoints causes Chargebee to reject the second call with an error.
+Use distinct idempotency keys for creating the Payment Intent and creating the subscription. Reusing the same key across different endpoints causes Chargebee to reject the second call with an HTTP 422 error. Estimate APIs do not create resources and do not accept idempotency keys.
 
 ✅ Do: Compute prices and taxes through the Estimate API before creating a Payment Intent.
 
-⚠️ Don't: Call `subscription.createWithItems` from the browser's `onSuccess` callback. If the user closes the tab before the API call finishes, the payment is authorized but the subscription is never created.
+⚠️ Don't: Call `subscription.createWithItems` from the browser's `onSuccess` callback. If the customer closes the tab during authorization, the payment succeeds but the subscription is never created. Fulfill via webhooks instead.
 
 ## 4. Record Native In-App Purchases
 
-Web modals are not allowed for digital goods inside iOS or Android apps. App Store and Google Play policies require native in-app purchases. Chargebee handles these through [Omnichannel Subscriptions](https://www.chargebee.com/docs/billing/2.0/mobile-subscriptions/omnichannel-subscription-overview).
+Web checkouts are prohibited for digital products inside iOS and Android apps. App Store and Google Play policies require native in-app purchases. Chargebee handles these through [Omnichannel Subscriptions](https://www.chargebee.com/docs/billing/2.0/mobile-subscriptions/omnichannel-subscription-overview).
 
-The app store manages billing renewals, cancellations, and payment retries. Chargebee maintains a mirrored subscription record so your backend can evaluate entitlements consistently across web and mobile users.
+Apple and Google manage renewals, cancellations, and payment collection. Chargebee maintains a mirrored subscription record so your backend can evaluate entitlements consistently across web and mobile platforms.
 
 ```mermaid
 sequenceDiagram
@@ -298,10 +297,10 @@ sequenceDiagram
 
 1. The customer completes a purchase using StoreKit 2 or Google Play Billing.
 2. The mobile app sends the transaction ID (Apple) or order ID and purchase token (Google) to your backend.
-3. Your backend verifies the user's session and links the purchase to their Chargebee customer ID.
+3. Your backend validates the user session and links the purchase to their Chargebee customer ID.
 4. Your backend calls `chargebee.recordedPurchase.create`.
 5. Chargebee returns a `recorded_purchase` object with `status: "in_process"`.
-6. Chargebee validates the purchase directly with Apple or Google and delivers an `omnichannel_subscription_created` webhook.
+6. Chargebee validates the receipt directly with Apple or Google and delivers an `omnichannel_subscription_created` webhook.
 7. Your webhook processor updates the local database mirror and unlocks the purchased features.
 
 ```typescript
@@ -322,15 +321,15 @@ For Google Play, pass `google_play_store.order_id` (format: `GPA.xxxx-xxxx-xxxx-
 
 Configure Apple App Store Server Notifications and Google Cloud Pub/Sub in Chargebee. When a user cancels, renews, or pauses in their app store settings, Chargebee updates the omnichannel subscription automatically.
 
-Chargebee's older mobile SDKs and wrappers belong to Mobile Subscriptions (Legacy) and no longer receive feature updates. New native applications should use StoreKit 2 and Google Play Billing directly, with receipts recorded via the Omnichannel API.
+Chargebee's older mobile SDKs belong to Mobile Subscriptions (Legacy) and no longer receive feature updates. New native applications should use StoreKit 2 and Google Play Billing directly, with receipts recorded via the Omnichannel API.
 
-✅ Do: Configure store server-to-server notifications so renewals, refunds, and cancellations sync to Chargebee.
+✅ Do: Configure store server-to-server notifications so renewals and cancellations sync to Chargebee.
 
 ⚠️ Don't: Create regular Chargebee Billing subscriptions for mobile purchases. Omnichannel subscriptions manage their own lifecycle and do not produce Chargebee invoices.
 
 ## 5. Verify Purchases And Recover From Failures
 
-Network timeouts, closed tabs, and expired sessions happen during checkout. A dependable integration treats the client callback as an optimistic hint, using server retrieval and webhooks to guarantee fulfillment.
+Network timeouts, closed tabs, and expired sessions occur during checkout. A dependable integration treats the client callback as an optimistic hint, using server retrieval and webhooks to guarantee fulfillment.
 
 ### Verify Completed Sessions
 
@@ -341,14 +340,14 @@ For Hosted Checkout, pass the returned `hosted_page.id` to your backend and call
 3. Confirm the subscription items match the user's selected plan.
 4. Mark the local checkout attempt completed to prevent replay attacks.
 
-After verification, update your local mirror and bust the user's cached entitlements immediately. This gives the customer instant access without waiting for background webhook delivery.
+After verification, update your local mirror and clear cached entitlements immediately. This gives the customer instant access without waiting for background webhook delivery.
 
 ### Recovery Scenarios
 
 | Scenario | System behavior | Recovery action |
 |:---|:---|:---|
 | Customer closes modal before paying | Hosted page remains in `created` state | Leave attempt open; generate a fresh hosted page if they resume later |
-| Hosted page session expires (3-hour TTL) | Chargebee rejects checkout with expired error | Prompt the user to restart checkout and generate a new page |
+| Hosted page session expires (3-hour TTL) | Chargebee rejects checkout with expired error | Prompt user to restart checkout and generate a new page |
 | Customer clicks Pay multiple times | Frontend sends duplicate requests | Return the existing intent or hosted page using a deterministic idempotency key |
 | User closes browser during 3DS redirect | Payment completes, but redirect handler never runs | Background `subscription_created` or `payment_intent_updated` webhook fulfills the order |
 | Webhook arrives before client redirect | Worker updates local mirror first | Client verification sees the updated record and redirects cleanly |
@@ -358,24 +357,24 @@ After verification, update your local mirror and bust the user's cached entitlem
 
 ⚠️ Don't: Trust URL query strings like `?state=succeeded` without calling `hostedPage.retrieve` on your backend.
 
-## See It Running In The Demo App
+## See It Running In The Pointer Demo App
 
-Pointer implements the Hosted Checkout model using `@chargebee/better-auth`. It provisions a free subscription at sign-up, opens an upgrade checkout when switching tiers, and refreshes entitlements immediately on return:
+The Pointer demo app uses Hosted Checkout via `@chargebee/better-auth`. It provisions a free subscription at sign-up, opens an upgrade checkout when switching tiers, and refreshes entitlements immediately on return:
 
-- [`pointer/app/choose-plan/_components/plan-picker.tsx`](../pointer/app/choose-plan/_components/plan-picker.tsx): Renders self-service plans and invokes `authClient.subscription.create` or `update`.
-- [`pointer/app/_components/account-provisioning.tsx`](../pointer/app/_components/account-provisioning.tsx): Waits for the initial customer record before opening an upgrade checkout.
-- [`pointer/lib/checkout-urls.ts`](../pointer/lib/checkout-urls.ts): Generates absolute success and cancel return URLs for hosted pages.
-- [`pointer/app/api/entitlements/checkout-complete/route.ts`](../pointer/app/api/entitlements/checkout-complete/route.ts): Handles the checkout return, verifies the authenticated user, and triggers an optimistic entitlement refresh.
-- [`pointer/plugins/chargebee-plugin.ts`](../pointer/plugins/chargebee-plugin.ts): Configures plan limits, organization billing permissions, and the webhook event bus.
-- [`pointer/workers/chargebee-webhook-processor.ts`](../pointer/workers/chargebee-webhook-processor.ts): Asynchronously updates the PostgreSQL subscription mirror and version records.
+* [`pointer/app/choose-plan/_components/plan-picker.tsx`](../pointer/app/choose-plan/_components/plan-picker.tsx): Renders self-service plans and invokes `authClient.subscription.create` or `update` to open Hosted Checkout.
+* [`pointer/app/_components/account-provisioning.tsx`](../pointer/app/_components/account-provisioning.tsx): Waits for the initial customer record before opening an upgrade checkout.
+* [`pointer/lib/checkout-urls.ts`](../pointer/lib/checkout-urls.ts): Generates absolute success and cancel return URLs for hosted pages.
+* [`pointer/app/api/entitlements/checkout-complete/route.ts`](../pointer/app/api/entitlements/checkout-complete/route.ts): Handles the checkout return, verifies the authenticated user, and triggers an optimistic entitlement refresh.
+* [`pointer/plugins/chargebee-plugin.ts`](../pointer/plugins/chargebee-plugin.ts): Configures plan limits, organization billing permissions, and the webhook event bus.
+* [`pointer/workers/chargebee-webhook-processor.ts`](../pointer/workers/chargebee-webhook-processor.ts): Asynchronously updates the PostgreSQL subscription mirror and version records.
 
 ## Go-Live Checklist
 
 - [ ] Is Product Catalog 2.0 active with plan item prices, addon prices, and currencies configured?
 - [ ] Does your checkout model match your platform (Hosted Checkout, Payment Components, or Omnichannel)?
-- [ ] Are Chargebee secret API keys restricted to backend environments, with only the publishable key exposed in browser bundles?
+- [ ] Are Chargebee secret API keys restricted to backend environments, with only publishable keys in browser bundles?
 - [ ] Is Chargebee.js loaded directly from `https://js.chargebee.com/v2/chargebee.js`?
-- [ ] Are hosted pages created via the API on your backend rather than unauthenticated client buttons?
+- [ ] Are hosted pages created via backend API calls rather than unauthenticated client buttons?
 - [ ] Are redirect URLs for PayPal, GoCardless, and Plaid tested with `embed: false`?
 - [ ] Do backend mutation calls include a unique, deterministic `chargebee-idempotency-key` header?
 - [ ] Does the custom checkout path compute estimates before generating Payment Intents?
