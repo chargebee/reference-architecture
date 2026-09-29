@@ -1,5 +1,5 @@
-import { getRedis } from "@/lib/redis";
 import type { EntitlementSubject } from "@/lib/entitlements/subject";
+import { getRedis } from "@/lib/redis";
 
 export const INPUT_CREDIT_MILLI_PER_TOKEN = 1;
 export const OUTPUT_CREDIT_MILLI_PER_TOKEN = 4;
@@ -48,6 +48,8 @@ return {1, next_input, next_output, next_credits,
         credit_cost, over_input, over_output}
 `;
 
+const RATE_GRACE_MS = 30_000;
+
 function compactUtc(date: Date): string {
 	return date.toISOString().slice(0, 16).replace(/\D/g, "");
 }
@@ -58,9 +60,23 @@ function nextUtcMidnight(now = new Date()): Date {
 	);
 }
 
+function nextUtcMinute(now = new Date()): Date {
+	return new Date(
+		Date.UTC(
+			now.getUTCFullYear(),
+			now.getUTCMonth(),
+			now.getUTCDate(),
+			now.getUTCHours(),
+			now.getUTCMinutes() + 1,
+		),
+	);
+}
+
 function nextMonthlyReset(subject: EntitlementSubject, now = new Date()): Date {
 	const periodEnd = subject.subscription.periodEnd;
-	if (periodEnd && periodEnd.getTime() > now.getTime()) return periodEnd;
+	if (periodEnd && periodEnd.getTime() > now.getTime()) {
+		return periodEnd;
+	}
 	return new Date(
 		Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, now.getUTCDate()),
 	);
@@ -85,7 +101,9 @@ function finiteLimit(limit: number): number {
 }
 
 function numbers(result: unknown): number[] {
-	if (!Array.isArray(result)) throw new Error("Unexpected Redis script result");
+	if (!Array.isArray(result)) {
+		throw new Error("Unexpected Redis script result");
+	}
 	return result.map(Number);
 }
 
@@ -104,13 +122,20 @@ export async function consumeRateLimit(
 		return { allowed: true, used: 0, retryAfterSeconds: 0 };
 	}
 	const key = usageKeys(subject, now).rate;
+	const reset = nextUtcMinute(now);
+	const cleanupMs = reset.getTime() - now.getTime() + RATE_GRACE_MS;
 	const [allowed, used, ttlMs] = numbers(
-		await getRedis().eval(RATE_SCRIPT, 1, key, finiteLimit(limit), 90_000),
+		await getRedis().eval(RATE_SCRIPT, 1, key, finiteLimit(limit), cleanupMs),
 	);
 	return {
 		allowed: allowed === 1,
 		used: used ?? 0,
-		retryAfterSeconds: Math.max(1, Math.ceil((ttlMs ?? 60_000) / 1_000)),
+		retryAfterSeconds: Math.max(
+			1,
+			Math.ceil(
+				Math.min(ttlMs ?? cleanupMs, reset.getTime() - now.getTime()) / 1_000,
+			),
+		),
 	};
 }
 
@@ -206,7 +231,7 @@ export async function claimUsageThreshold(
 	let ttlMs: number;
 	if (featureId === "f_api_rate_per_minute") {
 		period = compactUtc(now);
-		ttlMs = 90_000;
+		ttlMs = nextUtcMinute(now).getTime() - now.getTime() + RATE_GRACE_MS;
 	} else if (featureId === "f_credits_monthly") {
 		period = keys.monthlyReset.toISOString();
 		ttlMs = Math.max(1_000, keys.monthlyReset.getTime() - now.getTime());

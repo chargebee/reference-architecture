@@ -1,17 +1,17 @@
+import { isModelAllowed, type ModelTier, modelsForTier } from "@/lib/models";
 import {
-	features,
+	consumeGenerationUsage,
+	consumeRateLimit,
+	INPUT_CREDIT_MILLI_PER_TOKEN,
+	OUTPUT_CREDIT_MILLI_PER_TOKEN,
+	readUsageCounters,
+} from "@/lib/usage/counters";
+import {
 	type EntitlementLimits,
+	features,
 	type ResolvedEntitlements,
 } from "./features";
 import type { EntitlementSubject } from "./subject";
-import {
-	INPUT_CREDIT_MILLI_PER_TOKEN,
-	OUTPUT_CREDIT_MILLI_PER_TOKEN,
-	consumeGenerationUsage,
-	consumeRateLimit,
-	readUsageCounters,
-} from "@/lib/usage/counters";
-import { isModelAllowed, modelsForTier, type ModelTier } from "@/lib/models";
 
 const MILLI_PER_CREDIT = 1_000;
 
@@ -47,9 +47,53 @@ function remaining(used: number, limit: number): LimitValue {
 }
 
 function threshold(featureId: string, used: number, limit: number) {
-	if (!Number.isFinite(limit) || limit <= 0) return null;
+	if (!Number.isFinite(limit) || limit <= 0) {
+		return null;
+	}
 	const percent = Math.floor((used / limit) * 100);
 	return percent >= 80 ? { featureId, percent } : null;
+}
+
+export type UsageThreshold = {
+	featureId: string;
+	percent: number;
+};
+
+function usageThresholds(
+	counters: {
+		rateUsed?: number;
+		inputUsed: number;
+		outputUsed: number;
+		creditsUsed: number;
+	},
+	limits: EntitlementLimits,
+): UsageThreshold[] {
+	return [
+		threshold(
+			features.inputTokensDaily.featureId,
+			counters.inputUsed,
+			limits.inputTokensDaily,
+		),
+		threshold(
+			features.outputTokensDaily.featureId,
+			counters.outputUsed,
+			limits.outputTokensDaily,
+		),
+		threshold(
+			features.creditsMonthly.featureId,
+			counters.creditsUsed,
+			limits.creditsMonthly,
+		),
+		...(counters.rateUsed === undefined
+			? []
+			: [
+					threshold(
+						features.apiRatePerMinute.featureId,
+						counters.rateUsed,
+						limits.apiRatePerMinute,
+					),
+				]),
+	].filter((entry): entry is UsageThreshold => entry !== null);
 }
 
 export type UsageSnapshot = {
@@ -104,30 +148,7 @@ export async function getUsageSnapshot(
 ): Promise<UsageSnapshot> {
 	const limits = entitlements.limits;
 	const counters = await readUsageCounters(subject);
-	const thresholds = [
-		threshold(
-			features.inputTokensDaily.featureId,
-			counters.inputUsed,
-			limits.inputTokensDaily,
-		),
-		threshold(
-			features.outputTokensDaily.featureId,
-			counters.outputUsed,
-			limits.outputTokensDaily,
-		),
-		threshold(
-			features.creditsMonthly.featureId,
-			counters.creditsUsed,
-			limits.creditsMonthly,
-		),
-		threshold(
-			features.apiRatePerMinute.featureId,
-			counters.rateUsed,
-			limits.apiRatePerMinute,
-		),
-	].filter(
-		(entry): entry is { featureId: string; percent: number } => entry !== null,
-	);
+	const thresholds = usageThresholds(counters, limits);
 
 	return {
 		subscriptionId: subject.chargebeeSubscriptionId,
@@ -189,7 +210,7 @@ export async function getUsageSnapshot(
  * `Infinity` limits propagate through the arithmetic, so an unlimited plan
  * yields an unlimited budget without a special case.
  */
-function outputTokenBudget(
+export function outputTokenBudget(
 	limits: EntitlementLimits,
 	counters: { inputUsed: number; outputUsed: number; creditsUsed: number },
 	inputTokens: number,
@@ -226,6 +247,7 @@ export async function admitGeneration(
 	request: {
 		model: string;
 		inputTokens: number;
+		at?: Date;
 	},
 ) {
 	const limits = entitlements.limits;
@@ -238,7 +260,11 @@ export async function admitGeneration(
 		);
 	}
 
-	const rate = await consumeRateLimit(subject, limits.apiRatePerMinute);
+	const rate = await consumeRateLimit(
+		subject,
+		limits.apiRatePerMinute,
+		request.at,
+	);
 	if (!rate.allowed) {
 		throw new EntitlementGateError(
 			429,
@@ -251,7 +277,7 @@ export async function admitGeneration(
 
 	const budget = outputTokenBudget(
 		limits,
-		await readUsageCounters(subject),
+		await readUsageCounters(subject, request.at),
 		request.inputTokens,
 	);
 	if (budget < 1) {
@@ -267,6 +293,36 @@ export async function admitGeneration(
 }
 
 /**
+ * Checks usage mid-stream for long requests. Compares running tokens against
+ * the current remaining budget and emits 80% threshold warnings if crossed.
+ */
+export async function checkGenerationMidStream(
+	subject: EntitlementSubject,
+	entitlements: ResolvedEntitlements,
+	usage: {
+		inputTokens: number;
+		outputTokens: number;
+		at?: Date;
+	},
+) {
+	const limits = entitlements.limits;
+	const counters = await readUsageCounters(subject, usage.at);
+	const budget = outputTokenBudget(limits, counters, usage.inputTokens);
+
+	const running = {
+		rateUsed: counters.rateUsed,
+		inputUsed: counters.inputUsed + usage.inputTokens,
+		outputUsed: counters.outputUsed + usage.outputTokens,
+		creditsUsed: counters.creditsUsed,
+	};
+
+	return {
+		allowed: usage.outputTokens <= budget,
+		thresholds: usageThresholds(running, limits),
+	};
+}
+
+/**
  * Settles a finished generation: daily token quotas first, and whatever spills
  * past them against monthly credits. Only the provider knows the real output
  * token count, so this cannot move ahead of the call.
@@ -277,6 +333,7 @@ export async function meterGeneration(
 	usage: {
 		inputTokens: number;
 		outputTokens: number;
+		at?: Date;
 	},
 ) {
 	const limits = entitlements.limits;
@@ -288,15 +345,9 @@ export async function meterGeneration(
 			creditsMonthly: limits.creditsMonthly,
 		},
 		usage,
+		usage.at,
 	);
-	if (!consumed.allowed) {
-		throw new EntitlementGateError(
-			402,
-			"quota_exceeded",
-			features.creditsMonthly.featureId,
-			QUOTA_EXHAUSTED,
-		);
-	}
+
 	return {
 		...consumed,
 		source:
