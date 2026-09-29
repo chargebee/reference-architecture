@@ -873,7 +873,7 @@ Authorization: Basic <API-KEY>
         payload:
 `{
   "customer": {
-    "id": "cust_KPjZ3wLm8NqRf",
+    "id": "cust_abc123",
     "email": "user@example.com",
     "first_name": "John",
     "last_name": "Doe",
@@ -889,7 +889,7 @@ Authorization: Basic <API-KEY>
         desc:"Plugin updates user row with <em>chargebeeCustomerId</em>.",
         payload:
 `UPDATE user
-SET chargebeeCustomerId = 'cust_KPjZ3wLm8NqRf'
+SET chargebeeCustomerId = 'cust_abc123'
 WHERE id = 'usr_abc123';`,
         chips:["~15ms"]
       },
@@ -901,7 +901,7 @@ WHERE id = 'usr_abc123';`,
         payload:
 `POST /api/v2/subscriptions
 {
-  "customer_id": "cust_KPjZ3wLm8NqRf",
+  "customer_id": "cust_abc123",
   "plan_id": "free-plan",
   "billing_cycles": 0
 }`,
@@ -916,7 +916,7 @@ WHERE id = 'usr_abc123';`,
 `{
   "subscription": {
     "id": "sub_xyz123",
-    "customer_id": "cust_KPjZ3wLm8NqRf",
+    "customer_id": "cust_abc123",
     "plan_id": "free-plan",
     "status": "active"
   }
@@ -961,7 +961,7 @@ X-Chargebee-Webhook-Signature: sha256=...
   "content": {
     "subscription": {
       "id": "sub_xyz123",
-      "customer_id": "cust_KPjZ3wLm8NqRf",
+      "customer_id": "cust_abc123",
       "plan_id": "free-plan",
       "status": "active",
       "resource_version": 1725428450
@@ -1046,7 +1046,7 @@ WHERE resource_type = 'subscription'
 `BEGIN;
 
 INSERT INTO subscription (id, customerId, planId, status, resourceVersion)
-VALUES ('sub_xyz123', 'cust_KPjZ3wLm8NqRf', 'free-plan', 'active', 1725428450)
+VALUES ('sub_xyz123', 'cust_abc123', 'free-plan', 'active', 1725428450)
 ON CONFLICT (id) DO UPDATE
 SET status = EXCLUDED.status, resourceVersion = EXCLUDED.resourceVersion;
 
