@@ -13,6 +13,7 @@ Chargebee is the system of record for billing aggregation and invoices, but your
 
 ## Setup
 
+- Usage-based billing [configured](https://www.chargebee.com/docs/billing/2.0/usage-based-billing/understanding-usages#test-site)
 - Product Catalog 2.0 with [metered features](https://www.chargebee.com/docs/billing/2.0/usage-based-billing/defining-metered-features) and linked pricing configured
 - A fast local buffer (such as a Redis Stream or durable message queue) on the request path
 - A local event store (such as PostgreSQL) for audit trails and billing reconciliation

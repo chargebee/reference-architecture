@@ -60,6 +60,8 @@ While the Chargebee [docs](https://chargebee.com/docs) and [apidocs](https://api
 | [Enforcing entitlement checks](./how-to/entitlement-checks.md) | In Review | |
 | [Sync Chargebee entities](./how-to/sync-chargebee-entities.md) | Draft | |
 | [Usage-based billing](./how-to/usage-based-billing.md) | Draft | |
+| [Usage alerts](./how-to/usage-alerts.md) | In Progress | |
+| [Checkout experience](./how-to/checkout-experience.md) | In Progress | |
 
 ## Reference App
 
