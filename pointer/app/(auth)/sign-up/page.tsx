@@ -40,8 +40,8 @@ function SignUpForm() {
 		const password = String(formData.get("password") ?? "");
 
 		// Email verification is disabled, so Better Auth signs the user in
-		// immediately. The home page waits for the automatically-created free
-		// subscription webhook and entitlement mirror before rendering.
+		// immediately. The home page pulls the automatically-created free
+		// subscription and its entitlements from Chargebee before rendering.
 		const { error: signUpError } = await authClient.signUp.email({
 			name,
 			email,
