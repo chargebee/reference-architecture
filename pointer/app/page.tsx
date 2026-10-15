@@ -3,11 +3,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { auth } from "@/lib/auth";
+import { auth, type Session } from "@/lib/auth";
 import {
 	findSelfServicePlan,
 	selfServicePlans,
 } from "@/lib/self-service-plans";
+import { syncSignupBilling } from "@/lib/signup-sync";
 import { getActiveUserSubscription } from "@/lib/subscriptions";
 
 import { AccountProvisioning } from "./_components/account-provisioning";
@@ -19,10 +20,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 	const session = await auth.api.getSession({ headers: requestHeaders });
 	if (!session) return <MarketingHome />;
 
-	// Signing up provisions a free subscription in the background, so a brand
-	// new account lands here before its local record exists.
 	const { provisioning, plan } = await searchParams;
-	const subscription = await getActiveUserSubscription(session.user.id);
+	const subscription = await loadSubscription(session, provisioning);
 	const requestedPlan = findSelfServicePlan(plan);
 
 	// A paid plan picked on the pricing page can only go to checkout once that
@@ -41,6 +40,24 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 	}
 
 	return <SignedInHome />;
+}
+
+/**
+ * A brand-new account lands here before the subscription webhook mirrors its
+ * free plan. Pull it from Chargebee instead; the provisioning page only
+ * covers a failed pull.
+ */
+async function loadSubscription(
+	session: Session,
+	provisioning: string | string[] | undefined,
+) {
+	const subscription = await getActiveUserSubscription(session.user.id);
+	if (subscription || provisioning !== "1") {
+		return subscription;
+	}
+
+	await syncSignupBilling(session);
+	return getActiveUserSubscription(session.user.id);
 }
 
 function SignedInHome() {

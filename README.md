@@ -56,12 +56,12 @@ While the Chargebee [docs](https://chargebee.com/docs) and [apidocs](https://api
 
 | Topic | Status | Last Updated |
 |-------|--------|--------------|
-| [Integrating Chargebee webhooks](./how-to/webhooks.md) | In Review | |
-| [Enforcing entitlement checks](./how-to/entitlement-checks.md) | In Review | |
-| [Sync Chargebee entities](./how-to/sync-chargebee-entities.md) | Draft | |
-| [Usage-based billing](./how-to/usage-based-billing.md) | Draft | |
-| [Usage alerts](./how-to/usage-alerts.md) | In Progress | |
-| [Checkout experience](./how-to/checkout-experience.md) | In Progress | |
+| [Integrating Chargebee webhooks](./how-to/webhooks.md) | Pending Review | |
+| [Enforcing entitlement checks](./how-to/entitlement-checks.md) | Pending Review | |
+| [Sync Chargebee entities](./how-to/sync-chargebee-entities.md) | Pending Review | |
+| [Usage-based billing](./how-to/usage-based-billing.md) | Pending Review | |
+| [Usage alerts](./how-to/usage-alerts.md) | Pending Review | |
+| [Checkout experience](./how-to/checkout-experience.md) | Pending Review | |
 
 ## Reference App
 

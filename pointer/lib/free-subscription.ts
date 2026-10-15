@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import type Chargebee from "chargebee";
-import type { Subscription } from "chargebee";
+import type { Customer, Subscription } from "chargebee";
 
 import { itemPriceIdFor } from "@/scripts/catalog";
 
@@ -20,6 +20,24 @@ export type FreeSubscriptionResult = {
 	created: boolean;
 };
 
+export type LiveSubscription = {
+	subscription: Subscription;
+	customer: Customer;
+};
+
+/** The customer's live subscription, with the customer it bills. */
+export async function findLiveSubscription(
+	client: SubscriptionClient,
+	customerId: string,
+): Promise<LiveSubscription | null> {
+	const existing = await client.subscription.list({
+		customer_id: { is: customerId },
+		status: { in: [...LIVE_SUBSCRIPTION_STATUSES] },
+		limit: 1,
+	});
+	return existing.list?.[0] ?? null;
+}
+
 function signupSubscriptionId(userId: string): string {
 	const digest = createHash("sha256").update(userId).digest("hex").slice(0, 32);
 	return `pointer-free-${digest}`;
@@ -37,12 +55,8 @@ export async function ensureFreeSubscription(
 	client: SubscriptionClient,
 	input: { customerId: string; userId: string },
 ): Promise<FreeSubscriptionResult> {
-	const existing = await client.subscription.list({
-		customer_id: { is: input.customerId },
-		status: { in: [...LIVE_SUBSCRIPTION_STATUSES] },
-		limit: 1,
-	});
-	const current = existing.list?.[0]?.subscription;
+	const existing = await findLiveSubscription(client, input.customerId);
+	const current = existing?.subscription;
 	if (current) return { subscription: current, created: false };
 
 	const id = signupSubscriptionId(input.userId);

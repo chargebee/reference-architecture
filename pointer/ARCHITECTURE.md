@@ -64,7 +64,7 @@ flowchart TB
 The web and API service is responsible for:
 
 - **Authentication and accounts**: Better Auth with the organization plugin. Personal accounts bill against the individual user; team accounts bill against the organization.
-- **Chargebee provisioning**: On user creation, a Chargebee customer record is created (or reused), its ID is recorded on the `user` table, and an idempotent free subscription is provisioned with `billing_cycles: 0`. The home page waits for the initial subscription webhook before rendering, using free-tier defaults while the queued entitlement snapshot completes.
+- **Chargebee provisioning**: On user creation, a Chargebee customer record is created (or reused), its ID is recorded on the `user` table, and an idempotent free subscription is provisioned with `billing_cycles: 0`. The home page does not wait for the subscription webhook: it pulls the subscription and its entitlements from the Chargebee API and mirrors them, falling back to polling for the webhook if that fails.
 - **Webhook ingress**: The Chargebee webhook endpoint verifies HTTP Basic Auth, parses payloads, and immediately pushes them to AWS SQS. It executes no database operations, preventing webhook traffic spikes from exhausting connection pools or slowing HTTP requests.
 - **Live event stream**: Publishes domain events to a Redis stream, exposed via Server-Sent Events (SSE) for the `/admin/flow` diagnostic visualization.
 

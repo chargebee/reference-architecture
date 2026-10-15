@@ -77,7 +77,11 @@ async function assertLocalSubscription(
 	}
 }
 
-export type EntitlementSyncTrigger = "webhook" | "checkout" | "reconcile";
+export type EntitlementSyncTrigger =
+	| "webhook"
+	| "checkout"
+	| "signup"
+	| "reconcile";
 
 /**
  * Refetches a subscription's entitlements from Chargebee and rewrites the
